@@ -19,6 +19,10 @@ from flask import (
 )
 
 from . import prg32_format as fmt
+from .database import close_db
+from .metrics import register_metrics_routes
+from .multiplayer import register_multiplayer_routes
+from .scores import register_score_routes
 from .store import GameStore, StoreError
 
 
@@ -27,21 +31,41 @@ DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).resolve().parents[1]
+    data_dir = os.environ.get("PRG32_STORE_DATA", str(root / "data"))
     app = Flask(
         __name__,
         template_folder=str(root / "templates"),
         static_folder=str(root / "static"),
     )
     app.config.update(
-        DATA_DIR=os.environ.get("PRG32_STORE_DATA", str(root / "data")),
+        DATA_DIR=data_dir,
+        DATABASE=os.environ.get(
+            "PRG32_STORE_DB",
+            os.environ.get(
+                "PRG32_SCORE_DB",
+                os.environ.get(
+                    "PRG32_METRICS_DB",
+                    str(Path(data_dir) / "cartrige_store.sqlite"),
+                ),
+            ),
+        ),
         MAX_CONTENT_LENGTH=DEFAULT_MAX_UPLOAD,
+        MULTIPLAYER_MAX_PEERS=int(os.environ.get("PRG32_MP_MAX_PEERS", "8")),
         STORE_NAME="PRG32 Cartrige Store",
         STORE_VERSION="1.0.0",
     )
     if test_config:
         app.config.update(test_config)
+        if "DATABASE" not in test_config:
+            app.config["DATABASE"] = str(
+                Path(app.config["DATA_DIR"]) / "cartrige_store.sqlite"
+            )
 
     store = GameStore(app.config["DATA_DIR"])
+    app.teardown_appcontext(close_db)
+    register_score_routes(app)
+    register_metrics_routes(app)
+    register_multiplayer_routes(app)
 
     @app.errorhandler(StoreError)
     @app.errorhandler(fmt.CartridgeFormatError)
@@ -85,6 +109,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/.well-known/prg32-store.json")
     def discovery():
         base = request.host_url.rstrip("/")
+        ws_scheme = "wss" if request.scheme == "https" else "ws"
+        ws_base = f"{ws_scheme}://{request.host}"
         return jsonify(
             {
                 "abi": "prg32-store-discovery-1.0",
@@ -92,6 +118,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "api": base + "/api",
                 "web": base + "/",
                 "version": app.config["STORE_VERSION"],
+                "services": {
+                    "cartridges": base + "/api/games",
+                    "scores": base + "/api/scores",
+                    "metrics": base + "/api/runs",
+                    "multiplayer": ws_base + "/api/multiplayer",
+                    "multiplayer_status": base + "/api/multiplayer/status",
+                },
             }
         )
 

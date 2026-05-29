@@ -1,2 +1,3 @@
 Flask>=2.3,<4
+simple-websocket>=1,<2
 pytest>=8,<10
