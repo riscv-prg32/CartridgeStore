@@ -13,7 +13,27 @@ at one Cartrige Store host.
 The server name is **Cartrige Store**. The file format remains PRG32
 "cartridge" terminology.
 
-## Run
+## Quick Deploy With Docker
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:5080/>.
+
+The compose file mounts `./data` to `/data` in the container so uploaded
+cartridges, scores, metrics, and the catalog index persist across restarts.
+
+Stop the service:
+
+```bash
+docker compose down
+```
+
+See [docs/docker.md](docs/docker.md) for manual `docker run`, LAN deployment,
+logs, and maintenance notes.
+
+## Run With Python
 
 ```bash
 python3 -m venv .venv
@@ -31,6 +51,9 @@ store writes cartridges to `data/cartridges`, the extracted index to
 Set `PRG32_STORE_DB=/path/to/cartrige_store.sqlite` to choose a different
 SQLite database. Legacy `PRG32_SCORE_DB` and `PRG32_METRICS_DB` environment
 variables are also honored when `PRG32_STORE_DB` is not set.
+
+For a detailed environment setup, see
+[docs/getting_started.md](docs/getting_started.md).
 
 ## Versioning and Architectures
 
@@ -155,3 +178,10 @@ change the per-signature room limit.
 ```bash
 pytest -q
 ```
+
+## Documentation
+
+- [Getting started](docs/getting_started.md)
+- [Docker deployment](docs/docker.md)
+- [Unified service API](docs/api.md)
+- [Operations](docs/operations.md)

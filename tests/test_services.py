@@ -122,6 +122,28 @@ def test_multiplayer_hub_relays_same_signature() -> None:
     }
 
 
+def test_multiplayer_hub_cleans_stale_peer_on_broadcast() -> None:
+    hub = MultiplayerHub(max_peers=4)
+    first_messages = []
+    stale_messages = []
+    first = hub.connect(first_messages.append)
+
+    def stale_send(message):
+        stale_messages.append(message)
+        if len(stale_messages) > 1:
+            raise RuntimeError("closed")
+
+    stale = hub.connect(stale_send)
+
+    hub.receive(first, {"type": "join", "signature": "pong-v1", "player_id": 11})
+    hub.receive(stale, {"type": "join", "signature": "pong-v1", "player_id": 22})
+
+    hub.leave(first)
+
+    assert hub.status()["rooms"] == {}
+    assert stale.player_id == 0
+
+
 def test_discovery_lists_unified_services(tmp_path) -> None:
     client = make_client(tmp_path)
 

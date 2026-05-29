@@ -1,3 +1,5 @@
 Flask>=2.3,<4
+flask-sock>=0.7,<1
+gunicorn>=23,<24
 simple-websocket>=1,<2
 pytest>=8,<10
