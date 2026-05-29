@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18242f">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/style.css">
+  <title>{{ game.title }} - {{ store_name }}</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ store_name }}</a>
+    <nav>
+      <a href="/publish">Publish</a>
+      <a href="/api/games/{{ game.id }}">API</a>
+    </nav>
+  </header>
+
+  <main class="detail">
+    <section class="detail-head">
+      <img class="detail-icon" src="/api/games/{{ game.id }}/icon?version={{ game.selected_version }}" alt="">
+      <div>
+        <h1>{{ game.title }}</h1>
+        <p>{{ game.summary }}</p>
+        <div class="meta-row">
+          <span>{{ game.id }}</span>
+          <span>v{{ game.selected_version }}</span>
+        </div>
+        <div class="tag-row">
+          {% for tag in game.tags %}
+          <span>{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    {% if game.variants and game.variants[game.architectures[0]].has_screenshot %}
+    <section class="media-panel">
+      <img src="/api/games/{{ game.id }}/screenshot?version={{ game.selected_version }}&architecture={{ game.architectures[0] }}" alt="">
+    </section>
+    {% endif %}
+
+    <section class="download-panel">
+      <h2>Downloads</h2>
+      <div class="download-list">
+        {% for arch in game.architectures %}
+        <a class="button" href="/api/games/{{ game.id }}/download?version={{ game.selected_version }}&architecture={{ arch }}">
+          {{ arch }} .prg32
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="split">
+      <div>
+        <h2>Versions</h2>
+        <div class="pill-row">
+          {% for version in game.versions %}
+          <a class="pill" href="/games/{{ game.id }}?version={{ version }}">{{ version }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <h2>Authors</h2>
+        <ul class="plain-list">
+          {% for author in game.authors %}
+          <li>{{ author.name if author.name else author }}</li>
+          {% else %}
+          <li>Unknown</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    {% if game.colophon %}
+    <section class="colophon">
+      <h2>Colophon</h2>
+      <h3>{{ game.colophon.title }} {{ game.colophon.version }}</h3>
+      <p>{{ game.colophon.subtitle }}</p>
+      <p>{{ game.colophon.developer.name }}</p>
+      <dl>
+        {% for control in game.colophon.controls %}
+        <dt>{{ control.input }}</dt>
+        <dd>{{ control.action }}</dd>
+        {% endfor %}
+      </dl>
+      <p class="prompt">{{ game.colophon.start_prompt }}</p>
+    </section>
+    {% endif %}
+  </main>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

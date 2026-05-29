@@ -65,6 +65,9 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+# PRG32 Cartrige Store local storage
+data/
+
 # Scrapy stuff:
 .scrapy
 

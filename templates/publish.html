@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18242f">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/style.css">
+  <title>Publish - {{ store_name }}</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ store_name }}</a>
+    <nav>
+      <a href="/">Store</a>
+      <a href="/api/games">API</a>
+    </nav>
+  </header>
+
+  <main class="publish">
+    <form method="post" action="/publish" enctype="multipart/form-data">
+      <section>
+        <h1>Publish Cartridge</h1>
+        <div class="field-grid">
+          <label>ID<input name="id" required placeholder="org.example.game"></label>
+          <label>Title<input name="title" required></label>
+          <label>Version<input name="version" required value="1.0.0"></label>
+          <label>Architecture
+            <select name="architecture">
+              {% for key, arch in architectures.items() %}
+              <option value="{{ key }}">{{ arch.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Summary<input name="summary"></label>
+          <label>Tags<input name="tags" placeholder="arcade, riscv, education"></label>
+          <label>License<input name="license" value="MIT"></label>
+          <label>Author<input name="author_name"></label>
+          <label>Author Email<input name="author_email"></label>
+          <label>Homepage<input name="homepage"></label>
+          <label>Repository<input name="repository"></label>
+          <label>Minimum Firmware<input name="min_firmware"></label>
+        </div>
+        <label>Description<textarea name="description"></textarea></label>
+      </section>
+
+      <section>
+        <h2>Files</h2>
+        <div class="field-grid">
+          <label>Legacy or Monolithic .prg32<input type="file" name="cartridge" accept=".prg32" required></label>
+          <label>Icon PNG/JPEG<input type="file" name="icon" accept="image/png,image/jpeg" required></label>
+          <label>Screenshot PNG/JPEG<input type="file" name="screenshot" accept="image/png,image/jpeg"></label>
+          <label>Signature<input type="file" name="signature"></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Colophon</h2>
+        <div class="field-grid">
+          <label>Developer<input name="developer_name" required></label>
+          <label>Developer URL<input name="developer_url"></label>
+          <label>Subtitle<input name="subtitle"></label>
+          <label>Release Date<input name="release_date" placeholder="2026-05-29"></label>
+          <label>Controls<input name="controls" placeholder="A:Jump, B:Fire"></label>
+          <label>Start Prompt<input name="start_prompt" value="Press START to play"></label>
+        </div>
+        <label>Colophon JSON<textarea name="colophon"></textarea></label>
+        <label>Metadata JSON<textarea name="metadata"></textarea></label>
+      </section>
+
+      <button class="primary" type="submit">Publish</button>
+    </form>
+  </main>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

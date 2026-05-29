@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18242f">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/style.css">
+  <title>{{ store_name }}</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ store_name }}</a>
+    <nav>
+      <a href="/publish">Publish</a>
+      <a href="/api/games">API</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="toolbar">
+      <form class="search" method="get" action="/">
+        <input name="q" value="{{ q }}" placeholder="Search title, author, tag">
+        <button type="submit">Search</button>
+      </form>
+    </section>
+
+    <section class="game-grid" aria-label="Games">
+      {% for game in games %}
+      <article class="game-card">
+        <a class="icon-link" href="/games/{{ game.id }}">
+          <img src="/api/games/{{ game.id }}/icon" alt="">
+        </a>
+        <div class="game-card-body">
+          <h2><a href="/games/{{ game.id }}">{{ game.title }}</a></h2>
+          <p>{{ game.summary }}</p>
+          <div class="meta-row">
+            <span>v{{ game.latest_version }}</span>
+            <span>{{ game.architectures | join(", ") }}</span>
+          </div>
+          <div class="tag-row">
+            {% for tag in game.tags %}
+            <span>{{ tag }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+      {% else %}
+      <p class="empty">No cartridges published yet.</p>
+      {% endfor %}
+    </section>
+  </main>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
