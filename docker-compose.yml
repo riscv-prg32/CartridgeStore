@@ -1,0 +1,14 @@
+services:
+  cartrige-store:
+    build: .
+    image: riscv-prg32/cartrige-store:local
+    container_name: prg32-cartrige-store
+    ports:
+      - "5080:5080"
+    environment:
+      PRG32_STORE_DATA: /data
+      PRG32_STORE_DB: /data/cartrige_store.sqlite
+      PRG32_MP_MAX_PEERS: "8"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

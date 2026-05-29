@@ -9,6 +9,7 @@ from threading import Lock
 from typing import Any, Callable
 
 from flask import Flask, jsonify, request
+from flask_sock import Sock
 
 
 SIGNATURE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,47}$")
@@ -151,9 +152,21 @@ class MultiplayerHub:
         group = self.groups.get(signature)
         if not group:
             return
+        stale: list[MultiplayerPeer] = []
         for peer in list(group):
             if peer is not except_peer:
-                peer.send(message)
+                try:
+                    peer.send(message)
+                except Exception:
+                    stale.append(peer)
+        for peer in stale:
+            group.discard(peer)
+            peer.signature = ""
+            peer.flags = 0
+            peer.player_id = 0
+            peer.state = None
+        if not group:
+            self.groups.pop(signature, None)
 
     def _choose_player_id(self, group: set[MultiplayerPeer], requested: Any) -> int:
         used = {peer.player_id for peer in group if peer.player_id}
@@ -204,6 +217,7 @@ def _peer_message(player_id: int, state: dict[str, Any]) -> dict[str, Any]:
 def register_multiplayer_routes(app: Flask) -> None:
     hub = MultiplayerHub(max_peers=int(app.config["MULTIPLAYER_MAX_PEERS"]))
     app.extensions["prg32_multiplayer_hub"] = hub
+    sock = Sock(app)
 
     @app.get("/api/multiplayer/status")
     def multiplayer_status():
@@ -225,23 +239,11 @@ def register_multiplayer_routes(app: Flask) -> None:
             }
         )
 
-    @app.route("/api/multiplayer", websocket=True)
-    def multiplayer_websocket():
-        try:
-            from simple_websocket import ConnectionClosed, Server
-        except ImportError:
-            return jsonify(
-                {
-                    "ok": False,
-                    "error": "install simple-websocket to enable multiplayer relay",
-                }
-            ), 501
-
-        ws = Server.accept(request.environ)
+    @sock.route("/api/multiplayer")
+    def multiplayer_websocket(ws):
         peer = hub.connect(lambda message: ws.send(json.dumps(message)))
         try:
             while True:
                 hub.receive(peer, ws.receive())
-        except ConnectionClosed:
+        finally:
             hub.leave(peer)
-        return ""
