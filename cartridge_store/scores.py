@@ -1,0 +1,65 @@
+"""Score API integrated from the PRG32 ScoreServer."""
+
+from __future__ import annotations
+
+import time
+
+from flask import Flask, jsonify, request
+
+from .auth import current_principal, require_role
+from .database import get_db
+
+
+def register_score_routes(app: Flask) -> None:
+    @app.get("/api/scores")
+    def api_scores():
+        game = request.args.get("game")
+        limit = min(max(request.args.get("limit", default=20, type=int), 1), 100)
+        db = get_db()
+        if game:
+            rows = db.execute(
+                """
+                SELECT game, player, score, created_at, submitted_by
+                FROM scores
+                WHERE game = ?
+                ORDER BY score DESC, created_at ASC
+                LIMIT ?
+                """,
+                (game, limit),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """
+                SELECT game, player, score, created_at, submitted_by
+                FROM scores
+                ORDER BY score DESC, created_at ASC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return jsonify([dict(row) for row in rows])
+
+    @app.post("/api/scores")
+    @require_role("player")
+    def api_submit_score():
+        data = request.get_json(silent=True) or {}
+        game = str(data.get("game", "")).strip()[:24]
+        player = str(data.get("player", "")).strip()[:24]
+        try:
+            score = int(data.get("score"))
+        except (TypeError, ValueError):
+            score = -1
+
+        if not game or not player or score < 0:
+            return jsonify({"ok": False, "error": "expected game, player, score"}), 400
+
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO scores(game, player, score, created_at, submitted_by)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (game, player, score, int(time.time()), current_principal().name),
+        )
+        db.commit()
+        return jsonify({"ok": True})

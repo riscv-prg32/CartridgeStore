@@ -19,6 +19,10 @@ from flask import (
 )
 
 from . import prg32_format as fmt
+from .auth import ROLE_LEVELS, auth_is_configured, current_principal, require_role
+from .database import close_db, init_db
+from .metrics import register_metrics_routes
+from .scores import register_score_routes
 from .store import GameStore, StoreError
 
 
@@ -34,14 +38,32 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     )
     app.config.update(
         DATA_DIR=os.environ.get("PRG32_STORE_DATA", str(root / "data")),
+        SERVICES_DB=None,
         MAX_CONTENT_LENGTH=DEFAULT_MAX_UPLOAD,
         STORE_NAME="PRG32 Cartrige Store",
         STORE_VERSION="1.0.0",
+        MULTIPLAYER_URL=os.environ.get("PRG32_MULTIPLAYER_URL", ""),
+        USERS=None,
     )
     if test_config:
         app.config.update(test_config)
+    if not app.config.get("SERVICES_DB"):
+        app.config["SERVICES_DB"] = (
+            os.environ.get("PRG32_STORE_DB")
+            or os.environ.get("PRG32_METRICS_DB")
+            or os.environ.get("PRG32_SCORE_DB")
+            or str(Path(app.config["DATA_DIR"]) / "services.sqlite3")
+        )
 
     store = GameStore(app.config["DATA_DIR"])
+
+    @app.before_request
+    def before_request() -> None:
+        init_db()
+
+    @app.teardown_appcontext
+    def teardown_appcontext(error: BaseException | None = None) -> None:
+        close_db(error)
 
     @app.errorhandler(StoreError)
     @app.errorhandler(fmt.CartridgeFormatError)
@@ -67,16 +89,20 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         game = store.public_game(game_id, version=request.args.get("version"))
         return render_template("game.html", game=game, store_name=app.config["STORE_NAME"])
 
-    @app.route("/publish", methods=["GET", "POST"])
+    @app.get("/publish")
     def publish_page():
-        if request.method == "POST":
-            result = publish_request(store)
-            return redirect(url_for("game_detail", game_id=result["id"]))
         return render_template(
             "publish.html",
             architectures=fmt.ARCHITECTURE_PROFILES,
             store_name=app.config["STORE_NAME"],
+            token=request.args.get("token", ""),
         )
+
+    @app.post("/publish")
+    @require_role("publisher")
+    def publish_page_post():
+        result = publish_request(store)
+        return redirect(url_for("game_detail", game_id=result["id"]))
 
     @app.get("/manifest.webmanifest")
     def manifest():
@@ -91,7 +117,42 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "name": app.config["STORE_NAME"],
                 "api": base + "/api",
                 "web": base + "/",
+                "scores": base + "/api/scores",
+                "metrics": base + "/api/runs",
+                "multiplayer": app.config["MULTIPLAYER_URL"],
+                "roles": list(ROLE_LEVELS),
                 "version": app.config["STORE_VERSION"],
+            }
+        )
+
+    @app.get("/api")
+    def api_index():
+        return jsonify(
+            {
+                "ok": True,
+                "service": app.config["STORE_NAME"],
+                "version": app.config["STORE_VERSION"],
+                "auth_enabled": auth_is_configured(),
+                "roles": list(ROLE_LEVELS),
+                "endpoints": [
+                    "GET /api/games",
+                    "POST /api/publish",
+                    "GET /api/scores",
+                    "POST /api/scores",
+                    "GET /api/runs",
+                    "POST /api/runs",
+                    "POST /api/metrics/batch",
+                ],
+            }
+        )
+
+    @app.get("/api/me")
+    def api_me():
+        return jsonify(
+            {
+                "ok": True,
+                "auth_enabled": auth_is_configured(),
+                "user": current_principal().as_dict(),
             }
         )
 
@@ -156,8 +217,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         )
 
     @app.post("/api/publish")
+    @require_role("publisher")
     def api_publish():
         return jsonify({"ok": True, "game": publish_request(store)})
+
+    register_score_routes(app)
+    register_metrics_routes(app)
 
     return app
 
@@ -279,6 +344,7 @@ def publish_request(store: GameStore) -> dict[str, Any]:
         image,
         parsed,
         architecture=fmt.normalize_architecture(architecture) or "esp32c6",
+        publisher=current_principal().name,
     )
 
 
