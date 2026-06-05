@@ -51,12 +51,14 @@ def register_mdns(app: Flask) -> None:
         server=_local_hostname(),
     )
     zeroconf = Zeroconf()
+    
     try:
-        zeroconf.register_service(info)
-    except Exception as exc:  # pragma: no cover - network environment dependent
+        zeroconf.register_service(info, allow_name_change=True)
+    except Exception:  # pragma: no cover - network environment dependent
         zeroconf.close()
-        log.warning("mDNS advertisement failed: %s", exc)
+        log.exception("mDNS advertisement failed")
         return
+
     app.extensions["prg32_mdns"] = {"zeroconf": zeroconf, "info": info}
     atexit.register(_close_mdns, zeroconf, info)
     log.info("Advertising %s via mDNS on port %s", service_name, port)
