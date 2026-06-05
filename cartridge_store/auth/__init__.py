@@ -65,6 +65,18 @@ ON users(external_provider, external_id);
 
 CREATE INDEX IF NOT EXISTS api_tokens_user_idx
 ON api_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS groups (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS user_groups (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    PRIMARY KEY(user_id, group_id)
+);
 """
 
 
@@ -77,6 +89,7 @@ class Principal:
     id: int | None = None
     email: str = ""
     external_provider: str | None = None
+    groups: tuple[str, ...] = ()
 
     @property
     def username(self) -> str:
@@ -89,6 +102,7 @@ class Principal:
             "username": self.name,
             "email": self.email,
             "role": self.role,
+            "groups": list(self.groups),
             "authenticated": self.authenticated,
         }
 
@@ -211,6 +225,7 @@ def token_hash(token: str) -> str:
 def init_auth_db() -> None:
     db = get_db()
     db.executescript(AUTH_SCHEMA)
+    db.execute("INSERT OR IGNORE INTO groups(name) VALUES ('editors')")
     db.commit()
 
 
@@ -225,6 +240,7 @@ def principal_from_row(row: Any | None, *, token: str = "") -> Principal:
         token=token,
         authenticated=True,
         external_provider=row["external_provider"],
+        groups=groups_for_user(int(row["id"])),
     )
 
 
@@ -236,6 +252,61 @@ def load_user(user_id: int) -> Principal:
 def user_count() -> int:
     row = get_db().execute("SELECT COUNT(*) AS count FROM users").fetchone()
     return int(row["count"] if row else 0)
+
+
+def group_id(name: str) -> int:
+    normalized = str(name).strip().lower()
+    if not normalized:
+        raise ValueError("group name is required")
+    db = get_db()
+    db.execute("INSERT OR IGNORE INTO groups(name) VALUES (?)", (normalized,))
+    row = db.execute("SELECT id FROM groups WHERE name = ?", (normalized,)).fetchone()
+    db.commit()
+    return int(row["id"])
+
+
+def add_user_to_group(user_id: int, group: str) -> None:
+    get_db().execute(
+        "INSERT OR IGNORE INTO user_groups(user_id, group_id) VALUES (?, ?)",
+        (user_id, group_id(group)),
+    )
+    get_db().commit()
+
+
+def remove_user_from_group(user_id: int, group: str) -> None:
+    get_db().execute(
+        """
+        DELETE FROM user_groups
+        WHERE user_id = ? AND group_id = (SELECT id FROM groups WHERE name = ?)
+        """,
+        (user_id, group),
+    )
+    get_db().commit()
+
+
+def set_user_group(user_id: int, group: str, enabled: bool) -> None:
+    if enabled:
+        add_user_to_group(user_id, group)
+    else:
+        remove_user_from_group(user_id, group)
+
+
+def groups_for_user(user_id: int) -> tuple[str, ...]:
+    rows = get_db().execute(
+        """
+        SELECT groups.name
+        FROM user_groups
+        JOIN groups ON groups.id = user_groups.group_id
+        WHERE user_groups.user_id = ?
+        ORDER BY groups.name
+        """,
+        (user_id,),
+    ).fetchall()
+    return tuple(str(row["name"]) for row in rows)
+
+
+def principal_in_group(principal: Principal, group: str) -> bool:
+    return str(group).strip().lower() in principal.groups
 
 
 def authenticate_token(token: str, users: Iterable[Principal] | None = None) -> Principal:
@@ -322,6 +393,27 @@ def admin_required(func: Callable[..., Any]) -> Callable[..., Any]:
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def group_required(group: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    required = str(group).strip().lower()
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any):
+            principal = current_principal()
+            if not principal.authenticated:
+                return _auth_failure("login required", 401)
+            if principal_in_group(principal, required):
+                return func(*args, **kwargs)
+            return _auth_failure(f"{required} group required", 403)
+
+        return wrapper
+
+    return decorator
+
+
+editor_required = group_required("editors")
 
 
 def require_role(role: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -411,6 +503,8 @@ def register_auth_routes(app: Flask) -> None:
             request.form["password"],
             role=role,
         )
+        if role == "admin":
+            add_user_to_group(user_id, "editors")
         session.clear()
         session["user_id"] = user_id
         session["role"] = role

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Submission #{{ submission.id }} - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Submission #{{ submission.id }}</h1>
+  <dl class="metric-list">
+    <dt>ID</dt><dd>{{ submission.game_id }}</dd>
+    <dt>Version</dt><dd>{{ submission.version }}</dd>
+    <dt>Authors</dt><dd>
+      {% for author in submission.metadata.authors %}
+      {{ author.name if author.name else author }}{% if not loop.last %}, {% endif %}
+      {% else %}
+      Unknown
+      {% endfor %}
+    </dd>
+    <dt>Status</dt><dd>{{ submission.status }}</dd>
+    <dt>Submitted By</dt><dd>{{ submission.submitted_by }}</dd>
+  </dl>
+</section>
+
+<form method="post" action="/editor/submissions/{{ submission.id }}/verify" class="setup-form">
+  <section>
+    <h2>Editable Metadata</h2>
+    <div class="field-grid">
+      <label>Title<input name="title" value="{{ submission.metadata.title }}" required></label>
+      <label>Summary<input name="summary" value="{{ submission.metadata.summary }}"></label>
+      <label>Tags<input name="tags" value="{{ submission.metadata.tags | join(', ') }}"></label>
+      <label>License<input name="license" value="{{ submission.metadata.license }}"></label>
+      <label>Homepage<input name="homepage" value="{{ submission.metadata.homepage }}"></label>
+      <label>Repository<input name="repository" value="{{ submission.metadata.repository }}"></label>
+    </div>
+    <label>Description<textarea name="description">{{ submission.metadata.description }}</textarea></label>
+  </section>
+  {% if submission.status == "pending" %}
+  <button class="primary" type="submit">Verify and Publish</button>
+  {% endif %}
+</form>
+
+{% if submission.status == "pending" %}
+<form method="post" action="/editor/submissions/{{ submission.id }}/reject">
+  <button type="submit">Reject</button>
+</form>
+{% endif %}
+{% endblock %}

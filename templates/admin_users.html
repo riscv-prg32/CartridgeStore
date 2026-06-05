@@ -7,7 +7,7 @@
   <h1>Users</h1>
   <table>
     <thead>
-      <tr><th>Username</th><th>Email</th><th>Role</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
+      <tr><th>Username</th><th>Email</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
     </thead>
     <tbody>
       {% for user in users %}
@@ -15,6 +15,7 @@
         <td><a href="/users/{{ user.username }}">{{ user.username }}</a></td>
         <td>{{ user.email }}</td>
         <td>{{ user.role }}</td>
+        <td>{{ user.groups | join(", ") }}</td>
         <td>{{ user.external_provider or "local" }}</td>
         <td>{{ user.created_at }}</td>
         <td class="action-cell">
@@ -24,6 +25,10 @@
               <option value="admin" {% if user.role == "admin" %}selected{% endif %}>admin</option>
             </select>
             <button type="submit">Set</button>
+          </form>
+          <form method="post" action="/admin/users/{{ user.id }}/groups">
+            <label class="inline-check"><input type="checkbox" name="editors" value="1" {% if "editors" in user.groups %}checked{% endif %}> editors</label>
+            <button type="submit">Save</button>
           </form>
           <form method="post" action="/admin/users/{{ user.id }}">
             <input type="hidden" name="_method" value="delete">

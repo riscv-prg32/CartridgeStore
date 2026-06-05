@@ -9,6 +9,7 @@ from unittest.mock import patch
 from cartridge_store import create_app
 from cartridge_store.export_run import export_run
 from cartridge_store.multiplayer import MultiplayerHub
+from tests.test_api import bundle_bytes, upload_bundle, verify_submission
 from tests.test_prg32_format import PNG_1X1, colophon, fake_cart, metadata
 
 
@@ -238,19 +239,20 @@ def test_unified_roles_gate_writes_when_configured(tmp_path) -> None:
     allowed_publish = client.post(
         "/api/publish",
         headers={"Authorization": "Bearer board-secret"},
-        data=publish_payload("esp32c6"),
+        data={"bundle": (io.BytesIO(bundle_bytes()), "bundle.zip")},
         content_type="multipart/form-data",
     )
     assert allowed_publish.status_code == 200
+    assert allowed_publish.get_json()["status"] == "pending"
 
     publisher_publish = client.post(
         "/api/publish",
         headers={"Authorization": "Bearer teach-secret"},
-        data=publish_payload("qemu"),
+        data={"bundle": (io.BytesIO(bundle_bytes()), "bundle.zip")},
         content_type="multipart/form-data",
     )
     assert publisher_publish.status_code == 200, publisher_publish.get_json()
-    assert publisher_publish.get_json()["game"]["publisher"] == "teacher"
+    assert publisher_publish.get_json()["status"] == "pending"
 
     me = client.get("/api/me", headers={"Authorization": "Bearer teach-secret"})
     user = me.get_json()["user"]
@@ -301,8 +303,24 @@ def test_local_auth_roles_and_admin_gate(tmp_path) -> None:
 
     with sqlite3.connect(app.config["DATABASE"]) as db:
         db.row_factory = sqlite3.Row
-        rows = db.execute("SELECT username, role FROM users ORDER BY id").fetchall()
+        rows = db.execute(
+            """
+            SELECT users.username, users.role, groups.name AS group_name
+            FROM users
+            LEFT JOIN user_groups ON user_groups.user_id = users.id
+            LEFT JOIN groups ON groups.id = user_groups.group_id
+            ORDER BY users.id
+            """
+        ).fetchall()
     assert [dict(row) for row in rows] == [
+        {"username": "admin", "role": "admin", "group_name": "editors"},
+        {"username": "student", "role": "user", "group_name": None},
+    ]
+
+    with sqlite3.connect(app.config["DATABASE"]) as db:
+        db.row_factory = sqlite3.Row
+        role_rows = db.execute("SELECT username, role FROM users ORDER BY id").fetchall()
+    assert [dict(row) for row in role_rows] == [
         {"username": "admin", "role": "admin"},
         {"username": "student", "role": "user"},
     ]
@@ -334,12 +352,16 @@ def test_api_token_can_publish(tmp_path) -> None:
     response = api_client.post(
         "/api/publish",
         headers={"Authorization": f"Bearer {token}"},
-        data=publish_payload("esp32c6"),
+        data={"bundle": (io.BytesIO(bundle_bytes()), "bundle.zip")},
         content_type="multipart/form-data",
     )
 
     assert response.status_code == 200
-    assert response.get_json()["game"]["publisher"] == "admin"
+    assert response.get_json()["status"] == "pending"
+    verified = verify_submission(owner, response.get_json()["submission_id"])
+    assert verified.status_code == 200
+    game = owner.get("/api/games/org.example.test").get_json()["game"]
+    assert game["publisher"] == "admin"
 
 
 def test_setup_theme_and_logo(tmp_path) -> None:
@@ -390,12 +412,9 @@ def test_setup_theme_and_logo(tmp_path) -> None:
 
 def test_download_stats_and_stats_page(tmp_path) -> None:
     client = make_client(tmp_path)
-    published = client.post(
-        "/api/publish",
-        data=publish_payload("esp32c6"),
-        content_type="multipart/form-data",
-    )
+    published = upload_bundle(client)
     assert published.status_code == 200
+    verify_submission(client, published.get_json()["submission_id"])
 
     download = client.get(
         "/api/games/org.example.test/download?architecture=esp32c6",
@@ -444,11 +463,8 @@ def test_user_runs_access_and_json_download(tmp_path) -> None:
 
 def test_cartridge_page_score_chart_and_download_count(tmp_path) -> None:
     client = make_client(tmp_path)
-    client.post(
-        "/api/publish",
-        data=publish_payload("esp32c6"),
-        content_type="multipart/form-data",
-    )
+    submission = upload_bundle(client)
+    verify_submission(client, submission.get_json()["submission_id"])
     client.post("/api/scores", json={"game": "org.example.test", "player": "Ada", "score": 42})
     client.get("/api/games/org.example.test/download?architecture=esp32c6")
 

@@ -9,14 +9,16 @@ authentication, and statistics contracts on one host.
 GET /.well-known/prg32-store.json
 ```
 
-The `services` object includes `cartridges`, `bundle_publish`, `scores`,
-`metrics`, `multiplayer`, and `multiplayer_status` URLs.
+The `services` object includes `cartridges`, `bundle_publish`, `submissions`,
+`scores`, `metrics`, `multiplayer`, and `multiplayer_status` URLs. When mDNS
+advertisement is enabled, the service is announced as `_http._tcp.local.`.
 
 ## Authentication
 
 The server requires `SECRET_KEY` and uses Flask signed-cookie sessions for
 browser login. Register the first local account at `/auth/register`; that user
-becomes `admin`. Later users default to `user` unless changed by an admin.
+becomes `admin` and is added to the `editors` group. Later users default to
+`user` unless changed by an admin.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -48,6 +50,9 @@ Routes requiring auth:
 | --- | --- |
 | `POST /api/publish` | logged in or Bearer token |
 | `POST /api/publish/bundle` | logged in or Bearer token |
+| `GET /api/submissions*` | `editors` group |
+| `POST /api/submissions/<id>/verify` | `editors` group |
+| `POST /api/submissions/<id>/reject` | `editors` group |
 | `POST /api/scores` | logged in or Bearer token |
 | `/setup`, `/setup/logo`, `/setup/favicon` | admin |
 | `/admin/*` | admin |
@@ -56,7 +61,8 @@ Routes requiring auth:
 Metrics ingestion remains compatible with existing clients. If a run is posted
 with a session or Bearer token, the run is linked to that user.
 
-Legacy `PRG32_USERS` tokens are still accepted for API and multiplayer clients.
+Legacy `PRG32_USERS` tokens are still accepted for API and multiplayer clients,
+but database users must belong to the `editors` group to verify submissions.
 
 ## Cartridge Catalog
 
@@ -70,8 +76,11 @@ Legacy `PRG32_USERS` tokens are still accepted for API and multiplayer clients.
 | `GET` | `/api/games/<id>/screenshot` | Fetch screenshot bytes |
 | `GET` | `/api/games/<id>/colophon` | Fetch colophon JSON |
 | `GET` | `/api/games/<id>/download` | Download `.prg32` artifact |
-| `POST` | `/api/publish` | Publish one cartridge variant |
-| `POST` | `/api/publish/bundle` | Publish a zip bundle |
+| `POST` | `/api/publish` | Upload a zip bundle package for review |
+| `POST` | `/api/publish/bundle` | Upload a zip bundle package for review |
+| `GET` | `/api/submissions` | List pending submissions for editors |
+| `POST` | `/api/submissions/<id>/verify` | Verify and publish a pending submission |
+| `POST` | `/api/submissions/<id>/reject` | Reject a pending submission |
 
 Download requests accept `version` and `architecture` query parameters.
 
@@ -115,14 +124,20 @@ filename and a non-empty `architectures` list:
 }
 ```
 
-Success:
+Both `/api/publish/bundle` and the compatibility alias `/api/publish` accept
+only zip packages. The old per-field `.prg32` upload shape is rejected.
+
+Upload success creates a pending submission. It does not add the cartridge to
+the public catalog until an editor verifies it:
 
 ```json
 {
-  "status": "ok",
+  "status": "pending",
+  "review_required": true,
+  "submission_id": 7,
   "id": "org.example.game",
   "version": "1.0.0",
-  "published": [
+  "submitted": [
     {"architecture": "qemu", "file": "game-qemu.prg32"}
   ]
 }
@@ -136,6 +151,38 @@ Minimal curl:
 curl -X POST http://host:5080/api/publish/bundle \
   -H "Authorization: Bearer prg32_..." \
   -F bundle=@game.zip
+```
+
+## Editor Verification
+
+Editors review pending uploads in `/editor/submissions` or through the
+submissions API. Editors may change descriptive metadata fields only:
+
+- `title`
+- `summary`
+- `description`
+- `tags`
+- `license`
+- `homepage`
+- `repository`
+
+The server preserves `id`, `version`, and `authors` from the submitted package.
+Attempts to change those fields through the API are rejected.
+
+Verify with metadata edits:
+
+```bash
+curl -X POST http://host:5080/api/submissions/7/verify \
+  -H "Authorization: Bearer prg32_..." \
+  -H 'Content-Type: application/json' \
+  -d '{"metadata":{"title":"Reviewed Title","tags":["class","demo"]}}'
+```
+
+Reject:
+
+```bash
+curl -X POST http://host:5080/api/submissions/7/reject \
+  -H "Authorization: Bearer prg32_..."
 ```
 
 ## Scores

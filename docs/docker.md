@@ -32,8 +32,8 @@ PRG32_STORE_DATA=/data
 PRG32_STORE_DB=/data/cartrige_store.sqlite
 ```
 
-This keeps uploaded cartridges, the catalog index, scores, and metrics outside
-the container image.
+This keeps uploaded cartridges, pending review packages, the catalog index,
+scores, and metrics outside the container image.
 
 ## Build Only
 
@@ -53,8 +53,9 @@ docker run --rm \
   prg32-cartrige-store:local
 ```
 
-Add `-e PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'`
-when you want token-protected write endpoints in a classroom deployment.
+Database users are the primary auth path. The first registered user is an admin
+and editor. Legacy `PRG32_USERS` tokens are still accepted for API clients, but
+database users in the `editors` group must verify pending cartridge packages.
 
 ## Classroom LAN Deployment
 
@@ -70,6 +71,10 @@ The discovery document is available at:
 ```text
 http://<host-ip>:5080/.well-known/prg32-store.json
 ```
+
+The service advertises itself via mDNS as `_http._tcp.local.`. Set
+`PRG32_MDNS_DISABLED=1` to turn that off, or `PRG32_MDNS_NAME` to change the
+advertised name.
 
 ## Maintenance
 

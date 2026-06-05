@@ -32,12 +32,16 @@ from .auth import (
     admin_required,
     auth_is_configured,
     current_principal,
+    groups_for_user,
     login_required,
     register_auth_routes,
+    set_user_group,
 )
 from .database import close_db, get_db
+from .mdns import register_mdns
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
+from .review import create_submission, register_review_routes
 from .scores import register_score_routes
 from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
 from .stats import game_download_breakdown, record_download, register_stats_routes
@@ -51,7 +55,7 @@ DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
 class CartridgeRequest(FlaskRequest):
     @property
     def max_content_length(self) -> int | None:
-        if self.path == "/api/publish/bundle":
+        if self.path in {"/api/publish/bundle", "/api/publish", "/publish"}:
             return int(current_app.config["BUNDLE_MAX_CONTENT_LENGTH"])
         return super().max_content_length
 
@@ -114,6 +118,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     register_multiplayer_routes(app)
     register_stats_routes(app, store)
     register_user_routes(app)
+    register_review_routes(app, store)
+    register_mdns(app)
 
     @app.errorhandler(StoreError)
     @app.errorhandler(fmt.CartridgeFormatError)
@@ -155,6 +161,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         )
 
     @app.get("/publish")
+    @login_required
     def publish_page():
         return render_template(
             "publish.html",
@@ -166,7 +173,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @login_required
     def publish_page_post():
         result = publish_request(store)
-        return redirect(url_for("game_detail", game_id=result["id"]))
+        flash(f"Package uploaded for editor review as submission #{result['submission_id']}.")
+        return redirect(url_for("publish_page"))
 
     @app.get("/setup")
     @admin_required
@@ -221,6 +229,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         _set_user_role(user_id, role)
         return redirect(url_for("admin_users"))
 
+    @app.post("/admin/users/<int:user_id>/groups")
+    @admin_required
+    def admin_user_groups(user_id: int):
+        set_user_group(user_id, "editors", bool(request.form.get("editors")))
+        return redirect(url_for("admin_users"))
+
     @app.route("/admin/users/<int:user_id>", methods=["DELETE", "POST"])
     @admin_required
     def admin_user_delete(user_id: int):
@@ -253,6 +267,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "services": {
                     "cartridges": base + "/api/games",
                     "bundle_publish": base + "/api/publish/bundle",
+                    "submissions": base + "/api/submissions",
                     "scores": base + "/api/scores",
                     "metrics": base + "/api/runs",
                     "multiplayer": ws_base + "/api/multiplayer",
@@ -270,9 +285,15 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "version": app.config["STORE_VERSION"],
                 "auth_enabled": auth_is_configured(),
                 "roles": list(ROLE_LEVELS),
+                "mdns": {
+                    "service": "_http._tcp.local.",
+                    "name": os.environ.get("PRG32_MDNS_NAME", app.config["STORE_NAME"]),
+                },
                 "endpoints": [
                     "GET /api/games",
                     "POST /api/publish",
+                    "POST /api/publish/bundle",
+                    "GET /api/submissions",
                     "GET /api/scores",
                     "POST /api/scores",
                     "GET /api/metrics",
@@ -359,7 +380,9 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.post("/api/publish")
     @login_required
     def api_publish():
-        return jsonify({"ok": True, "game": publish_request(store)})
+        result = publish_request(store)
+        result["legacy_endpoint"] = True
+        return jsonify(result)
 
     @app.post("/api/publish/bundle")
     @login_required
@@ -431,7 +454,12 @@ def _admin_user_rows(limit: int, offset: int) -> list[dict[str, Any]]:
         """,
         (limit, offset),
     ).fetchall()
-    return [dict(row) for row in rows]
+    users = []
+    for row in rows:
+        user = dict(row)
+        user["groups"] = groups_for_user(int(user["id"]))
+        users.append(user)
+    return users
 
 
 def _set_user_role(user_id: int, role: str) -> None:
@@ -551,6 +579,12 @@ def colophon_from_form(metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 def publish_request(store: GameStore) -> dict[str, Any]:
+    if request.files.get("bundle") is not None:
+        return publish_bundle_request(store)
+    raise StoreError("package upload required: upload a cartridge bundle (.zip)")
+
+
+def publish_legacy_form_request(store: GameStore) -> dict[str, Any]:
     architecture = request.form.get("architecture", "esp32c6")
     legacy = read_upload("cartridge", required=True)
     icon = read_upload("icon", required=True)
@@ -595,14 +629,16 @@ def publish_bundle_request(store: GameStore) -> dict[str, Any]:
     except zipfile.BadZipFile as exc:
         raise StoreError("bundle must be a valid zip file") from exc
 
-    _publish_prepared_bundle(store, prepared)
+    submission = create_submission(prepared)
     manifest = prepared[0]["manifest"]
     return {
-        "status": "ok",
+        "status": "pending",
         "ok": True,
+        "review_required": True,
+        "submission_id": submission["id"],
         "id": manifest["id"],
         "version": manifest["version"],
-        "published": [
+        "submitted": [
             {"architecture": item["architecture"], "file": item["file"]}
             for item in prepared
         ],

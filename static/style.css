@@ -358,9 +358,17 @@ label {
   gap: 8px;
 }
 
-.check-row input {
+.check-row input,
+.inline-check input {
   min-height: auto;
   width: auto;
+}
+
+.inline-check {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  margin: 0;
 }
 
 .result-area {

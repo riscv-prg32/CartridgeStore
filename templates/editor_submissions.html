@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Review - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Cartridge Review</h1>
+  <div class="pill-row">
+    <a class="pill" href="/editor/submissions?status=pending">Pending</a>
+    <a class="pill" href="/editor/submissions?status=verified">Verified</a>
+    <a class="pill" href="/editor/submissions?status=rejected">Rejected</a>
+    <a class="pill" href="/editor/submissions?status=all">All</a>
+  </div>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Cartridge</th><th>Version</th><th>Status</th><th>Submitted By</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+      {% for submission in submissions %}
+      <tr>
+        <td><a href="/editor/submissions/{{ submission.id }}">#{{ submission.id }}</a></td>
+        <td>{{ submission.metadata.title }}</td>
+        <td>{{ submission.version }}</td>
+        <td>{{ submission.status }}</td>
+        <td>{{ submission.submitted_by }}</td>
+        <td>{{ submission.created_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No submissions.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

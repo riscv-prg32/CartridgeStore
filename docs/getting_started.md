@@ -35,8 +35,9 @@ export PRG32_STORE_DB="$PWD/data/cartrige_store.sqlite"
 ```
 
 The directory stores uploaded cartridges under `data/cartridges`, custom theme
-assets under `data/static`, the catalog index in `data/index.json`, and service
-tables in `data/cartrige_store.sqlite`.
+assets under `data/static`, pending review packages under `data/pending`, the
+catalog index in `data/index.json`, and service tables in
+`data/cartrige_store.sqlite`.
 
 ## First-Run Setup
 
@@ -53,9 +54,9 @@ python app.py
 ```
 
 Open `http://127.0.0.1:5080/auth/register` and create the first account. The
-first registered user automatically receives the `admin` role. Visit `/setup`
-as that user to change the store name, theme, auth defaults, logo, and publish
-settings.
+first registered user automatically receives the `admin` role and is added to
+the `editors` group. Visit `/setup` as that user to change the store name,
+theme, auth defaults, logo, and publish settings.
 
 ## Run Checks
 
@@ -65,7 +66,7 @@ python -m pytest -q
 git diff --check
 ```
 
-## Publish and Scores
+## Package Publish and Review
 
 `POST /api/publish`, `POST /api/publish/bundle`, and `POST /api/scores` require
 a logged-in browser session or Bearer token. Create a token at `/auth/tokens`
@@ -78,7 +79,30 @@ curl -X POST http://127.0.0.1:5080/auth/tokens \
   -d '{"label":"board"}'
 ```
 
-Then submit scores:
+Cartridges are published only as zip packages. Uploading a package creates a
+pending submission:
+
+```bash
+curl -X POST http://127.0.0.1:5080/api/publish/bundle \
+  -H "Authorization: Bearer prg32_..." \
+  -F bundle=@game.zip
+```
+
+An editor must verify the submission before it appears in `/api/games`:
+
+```bash
+curl -X POST http://127.0.0.1:5080/api/submissions/1/verify \
+  -b cookies.txt -c cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"metadata":{"title":"Reviewed Title"}}'
+```
+
+Editors may edit descriptive metadata, but the server preserves cartridge id,
+version, and authorship from the uploaded package.
+
+## Scores
+
+Submit scores with a session or Bearer token:
 
 ```bash
 curl -X POST http://127.0.0.1:5080/api/scores \
@@ -89,6 +113,18 @@ curl -X POST http://127.0.0.1:5080/api/scores \
 
 Metrics ingestion remains open for firmware compatibility. Authenticated runs
 are linked to the submitting user and appear under `/users/<username>/runs`.
+
+## mDNS Discovery
+
+The server advertises itself on the local network as `_http._tcp.local.` with
+TXT records for `/`, `/api`, and `/.well-known/prg32-store.json`. Disable this
+with:
+
+```bash
+export PRG32_MDNS_DISABLED=1
+```
+
+Use `PRG32_MDNS_NAME` to override the advertised instance name.
 
 ## External Auth
 

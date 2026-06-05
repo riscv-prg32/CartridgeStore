@@ -15,6 +15,10 @@ storage mounted outside the container or process directory.
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
 | `PRG32_MP_MAX_PEERS` | `8` | WebSocket peers per multiplayer room |
 | `PRG32_USERS` | unset | Legacy `name:role:token` compatibility tokens |
+| `PRG32_MDNS_DISABLED` | unset | Set to `1` to disable mDNS advertisement |
+| `PRG32_MDNS_NAME` | `PRG32 Cartrige Store` | mDNS instance name |
+| `PRG32_MDNS_TYPE` | `_http._tcp.local.` | mDNS service type |
+| `PRG32_MDNS_PORT` | `5080` | mDNS advertised HTTP port |
 | `PRG32_LDAP_URL` | unset | LDAP activation URL |
 | `PRG32_LDAP_BASE_DN` | unset | LDAP search base |
 | `PRG32_LDAP_BIND_DN` | unset | LDAP service account DN |
@@ -37,9 +41,11 @@ storage mounted outside the container or process directory.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
 - Put the service behind HTTPS termination.
 - Preserve `PRG32_STORE_DATA` on durable storage.
-- Back up `cartrige_store.sqlite`, `index.json`, and `cartridges/`.
+- Back up `cartrige_store.sqlite`, `index.json`, `cartridges/`, and pending
+  submissions under `pending/`.
 - Configure reverse-proxy request size limits above `PRG32_BUNDLE_MAX_MB`.
 - Proxy WebSocket upgrades for `/api/multiplayer`.
+- Keep `zeroconf` installed if you want mDNS advertisement in production.
 
 Example Nginx WebSocket location:
 
@@ -61,3 +67,6 @@ Compose requires `SECRET_KEY`:
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose up --build
 ```
+
+The image continues if `zeroconf` is absent, but mDNS advertisement is disabled
+with a startup warning.
