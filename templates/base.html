@@ -48,6 +48,7 @@
       <a href="/admin/cartridges">Cartridges</a>
       {% endif %}
       {% if current_user.authenticated %}
+      <span class="nav-user">{{ current_user.username }}</span>
       <form method="post" action="/auth/logout" class="nav-form"><button type="submit">Logout</button></form>
       {% else %}
       <a href="/auth/login">Login</a>

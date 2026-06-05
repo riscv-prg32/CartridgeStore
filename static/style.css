@@ -81,6 +81,16 @@ a {
   text-decoration: none;
 }
 
+.nav-user {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nav-form {
   margin: 0;
 }
