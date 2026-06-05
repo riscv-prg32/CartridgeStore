@@ -53,10 +53,22 @@ Start the server:
 python app.py
 ```
 
-Open `http://127.0.0.1:5080/auth/register` and create the first account. The
-first registered user automatically receives the `admin` role and is added to
+The server creates a default administrator account:
+
+```text
+username: admin
+password: password
+```
+
+Log in at `http://127.0.0.1:5080/auth/login` and change the password before
+using the service beyond a disposable local demo. The default admin is also in
 the `editors` group. Visit `/setup` as that user to change the store name,
 theme, auth defaults, logo, and publish settings.
+
+New users register from `/auth/register` by entering only an email address. The
+server sends a verification link; following it lets the user set a password.
+The username is the verified email address. Without SMTP configured, the link
+is logged for development.
 
 ## Run Checks
 
@@ -141,6 +153,21 @@ installed:
 
 If an adapter is configured but its library is absent, startup logs a warning
 and local login remains available.
+
+## Registration Email
+
+Set these variables to send registration links by SMTP:
+
+```bash
+export PRG32_SMTP_HOST=smtp.example.edu
+export PRG32_SMTP_PORT=587
+export PRG32_SMTP_FROM=noreply@example.edu
+export PRG32_SMTP_USER=cartrige-store
+export PRG32_SMTP_PASSWORD=secret
+```
+
+`PRG32_SMTP_TLS` defaults to `true`; set it to `false` only for trusted local
+SMTP relays.
 
 ## Theme Customisation
 

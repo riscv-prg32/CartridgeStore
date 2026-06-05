@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Registration - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="auth-panel">
+  <h1>Complete Registration</h1>
+  {% if errors %}
+  <ul class="error-text">
+    {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  <form method="post" action="/auth/register/complete">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label>Username<input value="{{ email }}" disabled></label>
+    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Confirm Password<input name="password_confirm" type="password" autocomplete="new-password" minlength="10" required></label>
+    <button class="primary" type="submit">Create Account</button>
+  </form>
+</section>
+{% endblock %}

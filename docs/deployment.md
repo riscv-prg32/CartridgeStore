@@ -15,6 +15,12 @@ storage mounted outside the container or process directory.
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
 | `PRG32_MP_MAX_PEERS` | `8` | WebSocket peers per multiplayer room |
 | `PRG32_USERS` | unset | Legacy `name:role:token` compatibility tokens |
+| `PRG32_SMTP_HOST` | unset | SMTP host for registration emails |
+| `PRG32_SMTP_PORT` | `587` | SMTP port |
+| `PRG32_SMTP_FROM` | `noreply@localhost` | Registration email sender |
+| `PRG32_SMTP_USER` | unset | SMTP username |
+| `PRG32_SMTP_PASSWORD` | unset | SMTP password |
+| `PRG32_SMTP_TLS` | `true` | Enable STARTTLS for SMTP |
 | `PRG32_MDNS_DISABLED` | unset | Set to `1` to disable mDNS advertisement |
 | `PRG32_MDNS_NAME` | `PRG32 Cartrige Store` | mDNS instance name |
 | `PRG32_MDNS_TYPE` | `_http._tcp.local.` | mDNS service type |
@@ -38,6 +44,8 @@ storage mounted outside the container or process directory.
 ## Production Checklist
 
 - Set a high-entropy `SECRET_KEY`.
+- Change the seeded `admin` / `password` administrator credentials.
+- Configure SMTP so user registration links are delivered by email.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
 - Put the service behind HTTPS termination.
 - Preserve `PRG32_STORE_DATA` on durable storage.

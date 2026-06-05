@@ -11,10 +11,8 @@
   </ul>
   {% endif %}
   <form method="post" action="/auth/register">
-    <label>Username<input name="username" autocomplete="username" required></label>
     <label>Email<input name="email" type="email" autocomplete="email" required></label>
-    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
-    <button class="primary" type="submit">Register</button>
+    <button class="primary" type="submit">Send Registration Link</button>
   </form>
 </section>
 {% endblock %}

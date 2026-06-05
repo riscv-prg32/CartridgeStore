@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 import functools
 import hashlib
 import hmac
 import json
 import os
 import secrets
+import smtplib
 from typing import Any, Callable, Iterable
 
 from flask import (
@@ -26,6 +28,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.security import generate_password_hash
 
 from ..database import get_db
 
@@ -77,6 +80,18 @@ CREATE TABLE IF NOT EXISTS user_groups (
     group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     PRIMARY KEY(user_id, group_id)
 );
+
+CREATE TABLE IF NOT EXISTS registration_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    email      TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL,
+    used_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS registration_tokens_email_idx
+ON registration_tokens(email, used_at, expires_at);
 """
 
 
@@ -227,6 +242,24 @@ def init_auth_db() -> None:
     db.executescript(AUTH_SCHEMA)
     db.execute("INSERT OR IGNORE INTO groups(name) VALUES ('editors')")
     db.commit()
+    ensure_default_admin()
+
+
+def ensure_default_admin() -> None:
+    db = get_db()
+    row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
+    if row is None:
+        cursor = db.execute(
+            """
+            INSERT INTO users(username, email, password_hash, role)
+            VALUES (?, ?, ?, 'admin')
+            """,
+            ("admin", "admin@localhost", generate_password_hash("password")),
+        )
+        db.commit()
+        add_user_to_group(int(cursor.lastrowid), "editors")
+        return
+    add_user_to_group(int(row["id"]), "editors")
 
 
 def principal_from_row(row: Any | None, *, token: str = "") -> Principal:
@@ -358,7 +391,7 @@ def current_principal() -> Principal:
 
 
 def _wants_json() -> bool:
-    if request.path.startswith("/api/") or request.path.startswith("/auth/"):
+    if request.path.startswith("/api/") or request.is_json:
         return True
     best = request.accept_mimetypes.best_match(["application/json", "text/html"])
     return best == "application/json" and request.accept_mimetypes[best] > 0
@@ -444,8 +477,102 @@ def _token_response(token_id: int, label: str, token: str) -> dict[str, Any]:
     return {"ok": True, "id": token_id, "label": label, "token": token}
 
 
+def _normalize_email(email: str) -> str:
+    return str(email or "").strip().lower()
+
+
+def _registration_expires_at() -> str:
+    return (datetime.now(timezone.utc) + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _create_registration_token(email: str) -> str:
+    token = secrets.token_urlsafe(32)
+    db = get_db()
+    db.execute(
+        """
+        UPDATE registration_tokens
+        SET used_at = datetime('now')
+        WHERE email = ? AND used_at IS NULL
+        """,
+        (email,),
+    )
+    db.execute(
+        """
+        INSERT INTO registration_tokens(email, token_hash, expires_at)
+        VALUES (?, ?, ?)
+        """,
+        (email, token_hash(token), _registration_expires_at()),
+    )
+    db.commit()
+    return token
+
+
+def _load_registration_token(token: str) -> dict[str, Any] | None:
+    if not token:
+        return None
+    row = get_db().execute(
+        """
+        SELECT *
+        FROM registration_tokens
+        WHERE token_hash = ?
+          AND used_at IS NULL
+          AND expires_at > datetime('now')
+        """,
+        (token_hash(token),),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _mark_registration_token_used(token_id: int) -> None:
+    get_db().execute(
+        "UPDATE registration_tokens SET used_at = datetime('now') WHERE id = ?",
+        (token_id,),
+    )
+    get_db().commit()
+
+
+def _send_registration_email(email: str, link: str) -> None:
+    if current_app.config.get("TESTING"):
+        current_app.extensions["prg32_last_registration"] = {
+            "email": email,
+            "link": link,
+            "token": link.rsplit("token=", 1)[-1],
+        }
+        return
+    host = os.environ.get("PRG32_SMTP_HOST", "").strip()
+    if not host:
+        current_app.logger.warning("Registration link for %s: %s", email, link)
+        return
+    port = int(os.environ.get("PRG32_SMTP_PORT", "587"))
+    sender = os.environ.get("PRG32_SMTP_FROM", "noreply@localhost")
+    username = os.environ.get("PRG32_SMTP_USER", "")
+    password = os.environ.get("PRG32_SMTP_PASSWORD", "")
+    use_tls = os.environ.get("PRG32_SMTP_TLS", "true").lower() not in {"0", "false", "no"}
+
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = email
+    message["Subject"] = "Complete your PRG32 Cartrige Store registration"
+    message.set_content(
+        "Open this link to finish your PRG32 Cartrige Store registration:\n\n"
+        f"{link}\n\n"
+        "The link expires in 24 hours.\n"
+    )
+    with smtplib.SMTP(host, port, timeout=10) as smtp:
+        if use_tls:
+            smtp.starttls()
+        if username:
+            smtp.login(username, password)
+        smtp.send_message(message)
+
+
 def register_auth_routes(app: Flask) -> None:
-    from .local import authenticate_local_user, create_local_user, validate_registration
+    from .local import (
+        authenticate_local_user,
+        create_local_user,
+        validate_email_registration,
+        validate_registration_password,
+    )
     from .ldap_adapter import register_adapter as register_ldap_adapter
     from .oidc_adapter import register_adapter as register_oidc_adapter
     from .saml_adapter import register_adapter as register_saml_adapter
@@ -464,8 +591,9 @@ def register_auth_routes(app: Flask) -> None:
 
     @app.post("/auth/register")
     def auth_register():
-        errors = validate_registration(request.form)
+        errors = validate_email_registration(request.form)
         allow_registration = True
+        email = _normalize_email(request.form.get("email", ""))
         try:
             from ..settings import get_setting
 
@@ -474,12 +602,9 @@ def register_auth_routes(app: Flask) -> None:
         except Exception:
             domain = ""
 
-        if user_count() == 0:
-            allow_registration = True
         if not allow_registration:
             errors.append("registration is closed")
         if domain:
-            email = request.form.get("email", "").strip().lower()
             if not email.endswith("@" + domain.lower().lstrip("@")):
                 errors.append(f"email must belong to {domain}")
         if errors:
@@ -487,24 +612,74 @@ def register_auth_routes(app: Flask) -> None:
                 return jsonify({"ok": False, "error": "; ".join(errors)}), 400
             return render_template("auth_register.html", errors=errors), 400
 
-        role = "admin" if user_count() == 0 else "user"
-        if role != "admin":
-            try:
-                from ..settings import get_setting
+        existing = get_db().execute(
+            "SELECT id FROM users WHERE email = ? OR username = ?",
+            (email, email),
+        ).fetchone()
+        if existing is None:
+            token = _create_registration_token(email)
+            link = url_for("auth_register_complete_form", token=token, _external=True)
+            _send_registration_email(email, link)
+        if _wants_json():
+            return jsonify({"ok": True, "email": email, "message": "registration email sent"})
+        return render_template("auth_register_sent.html", email=email)
 
-                role = get_setting("auth_default_role", "user")
-            except Exception:
-                role = "user"
-            if role not in ("user", "admin"):
-                role = "user"
+    @app.get("/auth/register/complete")
+    def auth_register_complete_form():
+        token = request.args.get("token", "")
+        record = _load_registration_token(token)
+        if record is None:
+            return render_template("error.html", error="Registration link is invalid or expired."), 400
+        return render_template("auth_register_complete.html", email=record["email"], token=token)
+
+    @app.post("/auth/register/complete")
+    def auth_register_complete():
+        token = request.form.get("token", "")
+        record = _load_registration_token(token)
+        if record is None:
+            if _wants_json():
+                return jsonify({"ok": False, "error": "registration link is invalid or expired"}), 400
+            return render_template("error.html", error="Registration link is invalid or expired."), 400
+
+        errors = validate_registration_password(request.form)
+        if errors:
+            if _wants_json():
+                return jsonify({"ok": False, "error": "; ".join(errors)}), 400
+            return render_template(
+                "auth_register_complete.html",
+                email=record["email"],
+                token=token,
+                errors=errors,
+            ), 400
+
+        email = _normalize_email(record["email"])
+        existing = get_db().execute(
+            "SELECT id FROM users WHERE email = ? OR username = ?",
+            (email, email),
+        ).fetchone()
+        if existing is not None:
+            _mark_registration_token_used(int(record["id"]))
+            if _wants_json():
+                return jsonify({"ok": False, "error": "account already exists"}), 400
+            return render_template("error.html", error="Account already exists."), 400
+
+        try:
+            from ..settings import get_setting
+
+            role = get_setting("auth_default_role", "user")
+        except Exception:
+            role = "user"
+        if role not in ("user", "admin"):
+            role = "user"
         user_id = create_local_user(
-            request.form["username"],
-            request.form["email"],
+            email,
+            email,
             request.form["password"],
             role=role,
         )
         if role == "admin":
             add_user_to_group(user_id, "editors")
+        _mark_registration_token_used(int(record["id"]))
         session.clear()
         session["user_id"] = user_id
         session["role"] = role

@@ -45,38 +45,22 @@ variables are also honored when `PRG32_STORE_DB` is not set.
 For a detailed environment setup, see
 [docs/getting_started.md](docs/getting_started.md).
 
-## Unified Users and Roles
+## Users and Roles
 
-All services share one optional token model. With no users configured, the app
-runs in open classroom mode and keeps the legacy firmware contracts working.
+The service seeds a default administrator account:
 
-Set `PRG32_USERS` to enable role checks for write operations:
-
-```bash
-export PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'
+```text
+username: admin
+password: password
 ```
 
-JSON is also accepted:
+Change that password before real use. New users register by entering an email
+address, receiving a verification link, and setting a password from that link.
+Their username is the verified email address.
 
-```bash
-export PRG32_USERS='[
-  {"name":"teacher","role":"admin","token":"teach-secret"},
-  {"name":"board","role":"player","token":"board-secret"}
-]'
-```
-
-Roles are cumulative:
-
-- `reader`: browse the store, download games, read scores and metrics.
-- `player`: submit scores, create metrics runs, upload metrics batches, and join
-  multiplayer rooms.
-- `publisher`: publish cartridges.
-- `admin`: full access.
-
-HTTP clients may send `Authorization: Bearer <token>`, `X-PRG32-Token`, or
-`?token=<token>`. Browser publishing also accepts the token field. Multiplayer
-clients may send the token in the WebSocket query string or in the `join`
-message as `token`.
+Authenticated users can upload cartridge packages. Users in the `editors` group
+verify pending packages before they appear in the public catalog. Legacy
+`PRG32_USERS` tokens are still accepted for API and multiplayer clients.
 
 ## Versioning and Architectures
 
@@ -120,17 +104,8 @@ GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
 | `WS` | `/api/multiplayer` |
 | `GET` | `/.well-known/prg32-store.json` |
 
-`POST /api/publish` accepts `multipart/form-data` with:
-
-- `cartridge`: legacy or already-monolithic `.prg32`.
-- `metadata`: optional `prg32-metadata-1.0` JSON object. If omitted, form
-  fields such as `id`, `title`, `version`, `summary`, and `tags` are used.
-- `icon`: PNG or JPEG icon.
-- `screenshot`: optional PNG or JPEG screenshot.
-- `signature`: optional bytes or JSON signature object.
-- `colophon`: optional `prg32-colophon-1.0` JSON object. If omitted, colophon
-  form fields are used.
-- `architecture`: `esp32c6` or `qemu`.
+`POST /api/publish` and `POST /api/publish/bundle` accept `multipart/form-data`
+with a single `bundle=@game.zip` package. Uploads enter the editor review queue.
 
 ## Scores
 

@@ -16,13 +16,17 @@ advertisement is enabled, the service is announced as `_http._tcp.local.`.
 ## Authentication
 
 The server requires `SECRET_KEY` and uses Flask signed-cookie sessions for
-browser login. Register the first local account at `/auth/register`; that user
-becomes `admin` and is added to the `editors` group. Later users default to
-`user` unless changed by an admin.
+browser login. A default administrator account is created with username
+`admin` and password `password`; change that password before using the service
+outside a throwaway classroom demo. New users start at `/auth/register` by
+entering only an email address. The server sends a verification link; following
+that link lets the user set a password. The account username is the verified
+email address.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET/POST` | `/auth/register` | Create a local account |
+| `GET/POST` | `/auth/register` | Request an email verification link |
+| `GET/POST` | `/auth/register/complete` | Complete registration from the emailed link |
 | `GET/POST` | `/auth/login` | Authenticate and set the session cookie |
 | `POST` | `/auth/logout` | Clear the session |
 | `GET` | `/auth/me` | Current user JSON |
@@ -63,6 +67,9 @@ with a session or Bearer token, the run is linked to that user.
 
 Legacy `PRG32_USERS` tokens are still accepted for API and multiplayer clients,
 but database users must belong to the `editors` group to verify submissions.
+
+Registration email delivery uses SMTP when `PRG32_SMTP_HOST` is configured. In
+development without SMTP, the verification link is logged.
 
 ## Cartridge Catalog
 

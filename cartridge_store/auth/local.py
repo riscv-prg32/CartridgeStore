@@ -11,21 +11,25 @@ from ..database import get_db
 from . import ANONYMOUS, Principal, normalize_role, principal_from_row
 
 
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]{3,40}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def validate_registration(form: Any) -> list[str]:
+def validate_email_registration(form: Any) -> list[str]:
     errors: list[str] = []
-    username = str(form.get("username", "")).strip()
     email = str(form.get("email", "")).strip()
-    password = str(form.get("password", ""))
-    if not USERNAME_RE.fullmatch(username):
-        errors.append("username must be 3-40 letters, digits, underscores, or dashes")
     if not EMAIL_RE.fullmatch(email):
         errors.append("email must be valid")
+    return errors
+
+
+def validate_registration_password(form: Any) -> list[str]:
+    errors: list[str] = []
+    password = str(form.get("password", ""))
     if len(password) < 10:
         errors.append("password must be at least 10 characters")
+    confirmation = str(form.get("password_confirm", password))
+    if password != confirmation:
+        errors.append("password confirmation does not match")
     return errors
 
 

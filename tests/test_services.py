@@ -9,23 +9,29 @@ from unittest.mock import patch
 from cartridge_store import create_app
 from cartridge_store.export_run import export_run
 from cartridge_store.multiplayer import MultiplayerHub
-from tests.test_api import bundle_bytes, upload_bundle, verify_submission
+from tests.test_api import bundle_bytes, login_default_admin, upload_bundle, verify_submission
 from tests.test_prg32_format import PNG_1X1, colophon, fake_cart, metadata
 
 
 def make_client(tmp_path):
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     client = app.test_client()
-    register(client, "admin", "admin@example.com")
+    login_default_admin(client)
     return client
 
 
-def register(client, username: str, email: str, password: str = "longpassword") -> None:
+def register(client, email: str, password: str = "longpassword") -> None:
     response = client.post(
         "/auth/register",
-        data={"username": username, "email": email, "password": password},
+        data={"email": email},
     )
     assert response.status_code == 200
+    token = client.application.extensions["prg32_last_registration"]["token"]
+    complete = client.post(
+        "/auth/register/complete",
+        data={"token": token, "password": password, "password_confirm": password},
+    )
+    assert complete.status_code in (200, 302)
 
 
 def publish_payload(architecture: str = "esp32c6") -> dict:
@@ -298,8 +304,7 @@ def test_local_auth_roles_and_admin_gate(tmp_path) -> None:
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     client = app.test_client()
 
-    register(client, "admin", "admin@example.com")
-    register(client, "student", "student@example.com")
+    register(client, "student@example.com")
 
     with sqlite3.connect(app.config["DATABASE"]) as db:
         db.row_factory = sqlite3.Row
@@ -314,7 +319,7 @@ def test_local_auth_roles_and_admin_gate(tmp_path) -> None:
         ).fetchall()
     assert [dict(row) for row in rows] == [
         {"username": "admin", "role": "admin", "group_name": "editors"},
-        {"username": "student", "role": "user", "group_name": None},
+        {"username": "student@example.com", "role": "user", "group_name": None},
     ]
 
     with sqlite3.connect(app.config["DATABASE"]) as db:
@@ -322,7 +327,7 @@ def test_local_auth_roles_and_admin_gate(tmp_path) -> None:
         role_rows = db.execute("SELECT username, role FROM users ORDER BY id").fetchall()
     assert [dict(row) for row in role_rows] == [
         {"username": "admin", "role": "admin"},
-        {"username": "student", "role": "user"},
+        {"username": "student@example.com", "role": "user"},
     ]
 
     wrong = client.post(
@@ -336,16 +341,16 @@ def test_local_auth_roles_and_admin_gate(tmp_path) -> None:
 
     logged_in = client.post(
         "/auth/login",
-        data={"username": "admin", "password": "longpassword"},
+        data={"username": "admin", "password": "password"},
     )
-    assert logged_in.status_code == 200
+    assert logged_in.status_code in (200, 302)
     assert client.get("/admin/users").status_code == 200
 
 
 def test_api_token_can_publish(tmp_path) -> None:
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     owner = app.test_client()
-    register(owner, "admin", "admin@example.com")
+    login_default_admin(owner)
 
     token = owner.post("/auth/tokens", json={"label": "publisher"}).get_json()["token"]
     api_client = app.test_client()
@@ -438,8 +443,8 @@ def test_download_stats_and_stats_page(tmp_path) -> None:
 def test_user_runs_access_and_json_download(tmp_path) -> None:
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     owner = app.test_client()
-    register(owner, "admin", "admin@example.com")
-    register(owner, "alice", "alice@example.com")
+    login_default_admin(owner)
+    register(owner, "alice@example.com")
 
     run = post_metrics_run(owner, "alice-run")
     assert run.status_code == 200
@@ -450,10 +455,10 @@ def test_user_runs_access_and_json_download(tmp_path) -> None:
     assert batch.status_code == 200
 
     other = app.test_client()
-    register(other, "bob", "bob@example.com")
-    assert other.get("/users/alice/runs").status_code == 403
-    assert owner.get("/users/alice/runs").status_code == 200
-    assert owner.get("/users/alice/runs/alice-run").status_code == 200
+    register(other, "bob@example.com")
+    assert other.get("/users/alice@example.com/runs").status_code == 403
+    assert owner.get("/users/alice@example.com/runs").status_code == 200
+    assert owner.get("/users/alice@example.com/runs/alice-run").status_code == 200
 
     json_download = owner.get("/api/runs/alice-run?format=json")
     assert json_download.status_code == 200

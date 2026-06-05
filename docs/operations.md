@@ -57,6 +57,17 @@ version, and authorship are preserved from the uploaded package.
 Use `/editor/submissions` for the browser workflow or `/api/submissions` for
 API review.
 
+## User Registration
+
+The service seeds a default `admin` / `password` administrator. Change that
+password before real use. New users enter only an email address at
+`/auth/register`; the service sends a verification link that lets them set a
+password. Their username is the verified email address.
+
+Configure SMTP with `PRG32_SMTP_HOST`, `PRG32_SMTP_PORT`, `PRG32_SMTP_FROM`,
+`PRG32_SMTP_USER`, `PRG32_SMTP_PASSWORD`, and `PRG32_SMTP_TLS`. Without SMTP,
+registration links are logged for development.
+
 ## Access Tokens
 
 Database API tokens can upload packages and submit scores. Keep legacy

@@ -14,16 +14,30 @@ from tests.test_prg32_format import PNG_1X1, fake_cart, colophon, metadata
 def client(tmp_path):
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     test_client = app.test_client()
-    register(test_client, "admin", "admin@example.com")
+    login_default_admin(test_client)
     return test_client
 
 
-def register(client, username: str, email: str, password: str = "longpassword") -> None:
+def login_default_admin(client) -> None:
+    response = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "password"},
+    )
+    assert response.status_code in (200, 302)
+
+
+def register(client, email: str, password: str = "longpassword") -> None:
     response = client.post(
         "/auth/register",
-        data={"username": username, "email": email, "password": password},
+        data={"email": email},
     )
     assert response.status_code == 200
+    token = client.application.extensions["prg32_last_registration"]["token"]
+    complete = client.post(
+        "/auth/register/complete",
+        data={"token": token, "password": password, "password_confirm": password},
+    )
+    assert complete.status_code in (200, 302)
 
 
 def publish_payload(architecture: str = "esp32c6") -> dict:
@@ -177,15 +191,15 @@ def test_editor_can_change_metadata_but_not_identity(client) -> None:
 def test_non_editor_cannot_verify_submission(tmp_path) -> None:
     app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
     client = app.test_client()
-    register(client, "admin", "admin@example.com")
-    register(client, "student", "student@example.com")
+    login_default_admin(client)
+    register(client, "student@example.com")
 
     response = upload_bundle(client)
     submission_id = response.get_json()["submission_id"]
     blocked = verify_submission(client, submission_id)
     assert blocked.status_code == 403
 
-    client.post("/auth/login", data={"username": "admin", "password": "longpassword"})
+    client.post("/auth/login", data={"username": "admin", "password": "password"})
     assert verify_submission(client, submission_id).status_code == 200
 
 

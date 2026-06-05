@@ -53,9 +53,12 @@ docker run --rm \
   prg32-cartrige-store:local
 ```
 
-Database users are the primary auth path. The first registered user is an admin
-and editor. Legacy `PRG32_USERS` tokens are still accepted for API clients, but
-database users in the `editors` group must verify pending cartridge packages.
+Database users are the primary auth path. The image seeds `admin` / `password`
+as an administrator and editor; change that password before real use. New users
+register by email verification link. Configure `PRG32_SMTP_HOST` and related
+SMTP variables to send those links. Legacy `PRG32_USERS` tokens are still
+accepted for API clients, but database users in the `editors` group must verify
+pending cartridge packages.
 
 ## Classroom LAN Deployment
 
