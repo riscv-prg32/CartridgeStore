@@ -1,17 +1,7 @@
-# PRG32 Cartrige Store
+# PRG32 Cartridge Store
 
 An installable Flask/PWA catalog and classroom service hub for PRG32 `.prg32`
 game cartridges.
-
-This repository now contains the functionality that used to live in:
-
-- `riscv-prg32/ScoreServer`
-- `riscv-prg32/MetricsServer`
-- `riscv-prg32/MultiplayerServer`
-
-The older standalone repositories can be archived once deployments point here.
-The server name remains **Cartrige Store**. The file format and public PRG32
-terms remain "cartridge".
 
 ## Quick Deploy With Docker
 
