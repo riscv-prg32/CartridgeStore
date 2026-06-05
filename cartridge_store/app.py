@@ -19,6 +19,7 @@ from flask import (
 )
 
 from . import prg32_format as fmt
+from .auth import ROLE_LEVELS, auth_is_configured, current_principal, require_role
 from .database import close_db
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
@@ -32,6 +33,16 @@ DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     root = Path(__file__).resolve().parents[1]
     data_dir = os.environ.get("PRG32_STORE_DATA", str(root / "data"))
+    database_path = os.environ.get(
+        "PRG32_STORE_DB",
+        os.environ.get(
+            "PRG32_SCORE_DB",
+            os.environ.get(
+                "PRG32_METRICS_DB",
+                str(Path(data_dir) / "cartrige_store.sqlite"),
+            ),
+        ),
+    )
     app = Flask(
         __name__,
         template_folder=str(root / "templates"),
@@ -39,20 +50,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     )
     app.config.update(
         DATA_DIR=data_dir,
-        DATABASE=os.environ.get(
-            "PRG32_STORE_DB",
-            os.environ.get(
-                "PRG32_SCORE_DB",
-                os.environ.get(
-                    "PRG32_METRICS_DB",
-                    str(Path(data_dir) / "cartrige_store.sqlite"),
-                ),
-            ),
-        ),
+        DATABASE=database_path,
+        SERVICES_DB=None,
         MAX_CONTENT_LENGTH=DEFAULT_MAX_UPLOAD,
         MULTIPLAYER_MAX_PEERS=int(os.environ.get("PRG32_MP_MAX_PEERS", "8")),
         STORE_NAME="PRG32 Cartrige Store",
         STORE_VERSION="1.0.0",
+        USERS=None,
     )
     if test_config:
         app.config.update(test_config)
@@ -60,6 +64,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             app.config["DATABASE"] = str(
                 Path(app.config["DATA_DIR"]) / "cartrige_store.sqlite"
             )
+    if not app.config.get("SERVICES_DB"):
+        app.config["SERVICES_DB"] = app.config["DATABASE"]
 
     store = GameStore(app.config["DATA_DIR"])
     app.teardown_appcontext(close_db)
@@ -91,16 +97,20 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         game = store.public_game(game_id, version=request.args.get("version"))
         return render_template("game.html", game=game, store_name=app.config["STORE_NAME"])
 
-    @app.route("/publish", methods=["GET", "POST"])
+    @app.get("/publish")
     def publish_page():
-        if request.method == "POST":
-            result = publish_request(store)
-            return redirect(url_for("game_detail", game_id=result["id"]))
         return render_template(
             "publish.html",
             architectures=fmt.ARCHITECTURE_PROFILES,
             store_name=app.config["STORE_NAME"],
+            token=request.args.get("token", ""),
         )
+
+    @app.post("/publish")
+    @require_role("publisher")
+    def publish_page_post():
+        result = publish_request(store)
+        return redirect(url_for("game_detail", game_id=result["id"]))
 
     @app.get("/manifest.webmanifest")
     def manifest():
@@ -118,6 +128,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "api": base + "/api",
                 "web": base + "/",
                 "version": app.config["STORE_VERSION"],
+                "auth_enabled": auth_is_configured(),
+                "roles": list(ROLE_LEVELS),
                 "services": {
                     "cartridges": base + "/api/games",
                     "scores": base + "/api/scores",
@@ -125,6 +137,40 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                     "multiplayer": ws_base + "/api/multiplayer",
                     "multiplayer_status": base + "/api/multiplayer/status",
                 },
+            }
+        )
+
+    @app.get("/api")
+    def api_index():
+        return jsonify(
+            {
+                "ok": True,
+                "service": app.config["STORE_NAME"],
+                "version": app.config["STORE_VERSION"],
+                "auth_enabled": auth_is_configured(),
+                "roles": list(ROLE_LEVELS),
+                "endpoints": [
+                    "GET /api/games",
+                    "POST /api/publish",
+                    "GET /api/scores",
+                    "POST /api/scores",
+                    "GET /api/metrics",
+                    "GET /api/runs",
+                    "POST /api/runs",
+                    "POST /api/metrics/batch",
+                    "GET /api/multiplayer",
+                    "GET /api/multiplayer/status",
+                ],
+            }
+        )
+
+    @app.get("/api/me")
+    def api_me():
+        return jsonify(
+            {
+                "ok": True,
+                "auth_enabled": auth_is_configured(),
+                "user": current_principal().as_dict(),
             }
         )
 
@@ -189,6 +235,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         )
 
     @app.post("/api/publish")
+    @require_role("publisher")
     def api_publish():
         return jsonify({"ok": True, "game": publish_request(store)})
 
@@ -312,6 +359,7 @@ def publish_request(store: GameStore) -> dict[str, Any]:
         image,
         parsed,
         architecture=fmt.normalize_architecture(architecture) or "esp32c6",
+        publisher=current_principal().name,
     )
 
 

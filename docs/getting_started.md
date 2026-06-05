@@ -38,13 +38,7 @@ python --version
 python -m pytest -q
 ```
 
-Expected result:
-
-```text
-14 passed
-```
-
-The exact count can grow as tests are added, but the suite should pass.
+The exact test count can grow as tests are added, but the suite should pass.
 
 ## Local Data Directory
 
@@ -61,6 +55,18 @@ The directory stores:
 - uploaded cartridge artifacts under `data/cartridges`;
 - the extracted catalog index in `data/index.json`;
 - score and metrics tables in `data/cartrige_store.sqlite`.
+
+## Optional Users and Roles
+
+Open classroom mode is the default. To require tokens for write operations, set
+`PRG32_USERS` before starting the service:
+
+```bash
+export PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'
+```
+
+Use a `player` token for board score, metrics, and multiplayer writes. Use a
+`publisher` or `admin` token for cartridge publishing.
 
 ## Run Locally
 
@@ -165,6 +171,7 @@ Persistent data remains in `./data`.
 | `PRG32_SCORE_DB` | unset | Legacy score database fallback |
 | `PRG32_METRICS_DB` | unset | Legacy metrics database fallback |
 | `PRG32_MP_MAX_PEERS` | `8` | Maximum WebSocket peers per cartridge signature |
+| `PRG32_USERS` | unset | Optional `name:role:token` list or JSON user config |
 
 ## Development Checks
 

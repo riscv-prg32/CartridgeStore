@@ -38,10 +38,18 @@ docker compose up -d
 
 ```bash
 curl http://127.0.0.1:5080/.well-known/prg32-store.json
+curl http://127.0.0.1:5080/api
 curl http://127.0.0.1:5080/api/multiplayer/status
 ```
 
 The container health check uses the discovery document.
+
+## Access Tokens
+
+If `PRG32_USERS` is configured, keep the configured tokens with the deployment
+configuration and rotate them when a shared classroom token is exposed. Read
+endpoints remain available to readers; score, metrics, multiplayer joins, and
+publish writes require the matching role.
 
 ## Logs
 

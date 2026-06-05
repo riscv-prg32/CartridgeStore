@@ -17,19 +17,42 @@ The response includes:
   "name": "PRG32 Cartrige Store",
   "api": "http://host:5080/api",
   "web": "http://host:5080/",
+  "auth_enabled": false,
+  "roles": ["reader", "player", "publisher", "admin"],
   "services": {
     "cartridges": "http://host:5080/api/games",
     "scores": "http://host:5080/api/scores",
     "metrics": "http://host:5080/api/runs",
-    "multiplayer": "ws://host:5080/api/multiplayer"
+    "multiplayer": "ws://host:5080/api/multiplayer",
+    "multiplayer_status": "http://host:5080/api/multiplayer/status"
   }
 }
 ```
+
+## Users and Roles
+
+Role checks are optional. With no `PRG32_USERS` configured, write endpoints stay
+open for classroom firmware compatibility.
+
+When users are configured, roles are cumulative:
+
+| Role | Access |
+| --- | --- |
+| `reader` | Browse and read catalog, scores, metrics, and multiplayer status |
+| `player` | Submit scores, create metrics runs, upload samples, join multiplayer |
+| `publisher` | Publish cartridges |
+| `admin` | Full access |
+
+HTTP clients may send `Authorization: Bearer <token>`, `X-PRG32-Token`, or
+`?token=<token>`. Multiplayer clients may send a token in the WebSocket query
+string or in the `join` message.
 
 ## Cartridge Catalog
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api` | List unified service metadata |
+| `GET` | `/api/me` | Show the current token principal |
 | `GET` | `/api/games` | List games |
 | `GET` | `/api/games/<id>` | Fetch one game record |
 | `GET` | `/api/games/<id>/icon` | Fetch icon bytes |
@@ -65,6 +88,7 @@ The metrics API is compatible with the standalone PRG32 MetricsServer.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/metrics` | List metrics endpoints |
 | `POST` | `/api/runs` | Register or update a run |
 | `POST` | `/api/metrics/batch` | Submit frame samples |
 | `POST` | `/api/runs/<run_id>/finish` | Mark a run finished |
@@ -88,6 +112,15 @@ Minimal sample batch:
     {"frame": 1, "frame_us": 16000}
   ]
 }
+```
+
+The command-line exporter writes metadata, CSV, Markdown, LaTeX, and optional
+plot artifacts:
+
+```bash
+python -m cartridge_store.export_run demo-run \
+  --db data/cartrige_store.sqlite \
+  --out metrics_export/demo-run
 ```
 
 ## Multiplayer

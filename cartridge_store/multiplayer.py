@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 from threading import Lock
 from typing import Any, Callable
@@ -11,13 +12,30 @@ from typing import Any, Callable
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
+from .auth import (
+    ANONYMOUS,
+    Principal,
+    authenticate_token,
+    extract_token_from_headers,
+    parse_user_config,
+    role_at_least,
+)
+
 
 SIGNATURE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,47}$")
 
 
 class MultiplayerPeer:
-    def __init__(self, send_json: Callable[[dict[str, Any]], None]) -> None:
+    def __init__(
+        self,
+        send_json: Callable[[dict[str, Any]], None],
+        *,
+        connection_token: str = "",
+        principal: Principal = ANONYMOUS,
+    ) -> None:
         self.send_json = send_json
+        self.connection_token = connection_token
+        self.principal = principal
         self.signature = ""
         self.flags = 0
         self.player_id = 0
@@ -28,14 +46,29 @@ class MultiplayerPeer:
 
 
 class MultiplayerHub:
-    def __init__(self, max_peers: int = 8) -> None:
+    def __init__(
+        self,
+        max_peers: int = 8,
+        users: list[Principal] | None = None,
+    ) -> None:
         self.max_peers = max(1, max_peers)
+        self.users = users or []
         self.groups: dict[str, set[MultiplayerPeer]] = {}
         self.next_player_id = 1
         self.lock = Lock()
 
-    def connect(self, send_json: Callable[[dict[str, Any]], None]) -> MultiplayerPeer:
-        return MultiplayerPeer(send_json)
+    def connect(
+        self,
+        send_json: Callable[[dict[str, Any]], None],
+        *,
+        connection_token: str = "",
+    ) -> MultiplayerPeer:
+        principal = authenticate_token(connection_token, self.users) if self.users else ANONYMOUS
+        return MultiplayerPeer(
+            send_json,
+            connection_token=connection_token,
+            principal=principal,
+        )
 
     def receive(self, peer: MultiplayerPeer, raw: str | bytes | dict[str, Any]) -> None:
         if isinstance(raw, dict):
@@ -63,6 +96,17 @@ class MultiplayerHub:
             peer.send({"type": "error", "error": "unknown message type"})
 
     def join(self, peer: MultiplayerPeer, message: dict[str, Any]) -> None:
+        principal = self._authorize(peer, message)
+        if principal is None:
+            peer.send(
+                {
+                    "type": "error",
+                    "error": "player role required",
+                    "user": peer.principal.as_dict(),
+                }
+            )
+            return
+
         signature = str(message.get("signature", "")).strip()
         if not SIGNATURE_RE.fullmatch(signature):
             peer.send({"type": "error", "error": "invalid signature"})
@@ -76,6 +120,7 @@ class MultiplayerHub:
                 return
 
             player_id = self._choose_player_id(group, message.get("player_id"))
+            peer.principal = principal
             peer.signature = signature
             peer.flags = _uint32(message.get("flags"))
             peer.player_id = player_id
@@ -121,7 +166,27 @@ class MultiplayerHub:
                 "rooms": rooms,
                 "room_count": len(rooms),
                 "max_peers": self.max_peers,
+                "auth_enabled": bool(self.users),
             }
+
+    def _authorize(
+        self,
+        peer: MultiplayerPeer,
+        message: dict[str, Any],
+    ) -> Principal | None:
+        if not self.users:
+            return ANONYMOUS
+        token = str(
+            message.get("token")
+            or message.get("auth_token")
+            or peer.connection_token
+            or ""
+        ).strip()
+        principal = authenticate_token(token, self.users)
+        peer.principal = principal
+        if principal.authenticated and role_at_least(principal.role, "player"):
+            return principal
+        return None
 
     def _leave_locked(self, peer: MultiplayerPeer) -> None:
         if not peer.signature:
@@ -214,8 +279,18 @@ def _peer_message(player_id: int, state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _configured_users(app: Flask) -> list[Principal]:
+    raw = app.config.get("USERS")
+    if raw is None:
+        raw = os.environ.get("PRG32_USERS", "")
+    return parse_user_config(raw)
+
+
 def register_multiplayer_routes(app: Flask) -> None:
-    hub = MultiplayerHub(max_peers=int(app.config["MULTIPLAYER_MAX_PEERS"]))
+    hub = MultiplayerHub(
+        max_peers=int(app.config["MULTIPLAYER_MAX_PEERS"]),
+        users=_configured_users(app),
+    )
     app.extensions["prg32_multiplayer_hub"] = hub
     sock = Sock(app)
 
@@ -231,6 +306,7 @@ def register_multiplayer_routes(app: Flask) -> None:
                 "ok": True,
                 "service": "PRG32 multiplayer relay",
                 "websocket": f"{scheme}://{request.host}/api/multiplayer",
+                "auth_enabled": bool(hub.users),
                 "protocol": {
                     "join": {"type": "join", "signature": "game-v1", "player_id": 1},
                     "state": {"type": "state", "x": 0, "y": 0, "frame": 0},
@@ -241,7 +317,11 @@ def register_multiplayer_routes(app: Flask) -> None:
 
     @sock.route("/api/multiplayer")
     def multiplayer_websocket(ws):
-        peer = hub.connect(lambda message: ws.send(json.dumps(message)))
+        token = extract_token_from_headers(request.headers, request.args.get("token", ""))
+        peer = hub.connect(
+            lambda message: ws.send(json.dumps(message)),
+            connection_token=token,
+        )
         try:
             while True:
                 hub.receive(peer, ws.receive())

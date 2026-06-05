@@ -51,6 +51,9 @@ docker run --rm \
   prg32-cartrige-store:local
 ```
 
+Add `-e PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'`
+when you want token-protected write endpoints in a classroom deployment.
+
 ## Classroom LAN Deployment
 
 Find the host computer IP address and point boards to:

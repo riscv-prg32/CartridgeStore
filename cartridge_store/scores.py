@@ -6,7 +6,8 @@ import time
 
 from flask import Flask, jsonify, request
 
-from .database import get_db
+from .auth import current_principal, require_role
+from .database import add_column_if_missing, get_db
 
 
 def init_scores_db() -> None:
@@ -18,10 +19,12 @@ def init_scores_db() -> None:
             game TEXT NOT NULL,
             player TEXT NOT NULL,
             score INTEGER NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            submitted_by TEXT NOT NULL DEFAULT ''
         )
         """
     )
+    add_column_if_missing(db, "scores", "submitted_by", "TEXT NOT NULL DEFAULT ''")
     db.execute(
         "CREATE INDEX IF NOT EXISTS scores_game_score_idx "
         "ON scores(game, score DESC, created_at ASC)"
@@ -42,7 +45,7 @@ def register_score_routes(app: Flask) -> None:
         if game:
             rows = db.execute(
                 """
-                SELECT game, player, score, created_at
+                SELECT game, player, score, created_at, submitted_by
                 FROM scores
                 WHERE game = ?
                 ORDER BY score DESC, created_at ASC
@@ -53,7 +56,7 @@ def register_score_routes(app: Flask) -> None:
         else:
             rows = db.execute(
                 """
-                SELECT game, player, score, created_at
+                SELECT game, player, score, created_at, submitted_by
                 FROM scores
                 ORDER BY score DESC, created_at ASC
                 LIMIT ?
@@ -63,6 +66,7 @@ def register_score_routes(app: Flask) -> None:
         return jsonify([dict(row) for row in rows])
 
     @app.post("/api/scores")
+    @require_role("player")
     def submit_score():
         data = request.get_json(silent=True) or {}
         game = str(data.get("game", "")).strip()[:24]
@@ -78,10 +82,10 @@ def register_score_routes(app: Flask) -> None:
         db = get_db()
         db.execute(
             """
-            INSERT INTO scores(game, player, score, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO scores(game, player, score, created_at, submitted_by)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (game, player, score, int(time.time())),
+            (game, player, score, int(time.time()), current_principal().name),
         )
         db.commit()
         return jsonify({"ok": True})

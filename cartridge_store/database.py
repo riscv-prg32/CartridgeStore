@@ -19,6 +19,21 @@ def get_db() -> sqlite3.Connection:
     return g.db
 
 
+def table_columns(db: sqlite3.Connection, table: str) -> set[str]:
+    rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+    return {str(row["name"]) for row in rows}
+
+
+def add_column_if_missing(
+    db: sqlite3.Connection,
+    table: str,
+    column: str,
+    declaration: str,
+) -> None:
+    if column not in table_columns(db, table):
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+
+
 def close_db(error: BaseException | None = None) -> None:
     db = g.pop("db", None)
     if db is not None:

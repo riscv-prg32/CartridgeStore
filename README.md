@@ -1,17 +1,17 @@
 # PRG32 Cartrige Store
 
-An installable Flask/PWA catalog for PRG32 `.prg32` game cartridges. Developers
-can upload a legacy cartridge plus metadata, icon, optional screenshot,
-signature, and colophon; the server publishes a monolithic `PRG32META`
-cartridge artifact for firmware and QEMU clients to download.
+An installable Flask/PWA catalog and classroom service hub for PRG32 `.prg32`
+game cartridges.
 
-The same service also hosts the classroom score API, frame metrics receiver, and
-cartridge multiplayer relay. The standalone ScoreServer, MetricsServer, and
-MultiplayerServer contracts are preserved so existing firmware clients can point
-at one Cartrige Store host.
+This repository now contains the functionality that used to live in:
 
-The server name is **Cartrige Store**. The file format remains PRG32
-"cartridge" terminology.
+- `riscv-prg32/ScoreServer`
+- `riscv-prg32/MetricsServer`
+- `riscv-prg32/MultiplayerServer`
+
+The older standalone repositories can be archived once deployments point here.
+The server name remains **Cartrige Store**. The file format and public PRG32
+terms remain "cartridge".
 
 ## Quick Deploy With Docker
 
@@ -55,6 +55,39 @@ variables are also honored when `PRG32_STORE_DB` is not set.
 For a detailed environment setup, see
 [docs/getting_started.md](docs/getting_started.md).
 
+## Unified Users and Roles
+
+All services share one optional token model. With no users configured, the app
+runs in open classroom mode and keeps the legacy firmware contracts working.
+
+Set `PRG32_USERS` to enable role checks for write operations:
+
+```bash
+export PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'
+```
+
+JSON is also accepted:
+
+```bash
+export PRG32_USERS='[
+  {"name":"teacher","role":"admin","token":"teach-secret"},
+  {"name":"board","role":"player","token":"board-secret"}
+]'
+```
+
+Roles are cumulative:
+
+- `reader`: browse the store, download games, read scores and metrics.
+- `player`: submit scores, create metrics runs, upload metrics batches, and join
+  multiplayer rooms.
+- `publisher`: publish cartridges.
+- `admin`: full access.
+
+HTTP clients may send `Authorization: Bearer <token>`, `X-PRG32-Token`, or
+`?token=<token>`. Browser publishing also accepts the token field. Multiplayer
+clients may send the token in the WebSocket query string or in the `join`
+message as `token`.
+
 ## Versioning and Architectures
 
 A `.prg32` file contains one linked executable image. The store groups uploads
@@ -73,6 +106,8 @@ GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
 
 | Method | Path |
 | --- | --- |
+| `GET` | `/api` |
+| `GET` | `/api/me` |
 | `GET` | `/api/games` |
 | `GET` | `/api/games/<id>` |
 | `GET` | `/api/games/<id>/icon` |
@@ -82,6 +117,7 @@ GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
 | `POST` | `/api/publish` |
 | `GET` | `/api/scores` |
 | `POST` | `/api/scores` |
+| `GET` | `/api/metrics` |
 | `GET` | `/api/runs` |
 | `POST` | `/api/runs` |
 | `POST` | `/api/metrics/batch` |
@@ -89,7 +125,9 @@ GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
 | `GET` | `/api/runs/<run_id>` |
 | `GET` | `/api/runs/<run_id>/samples.csv` |
 | `GET` | `/api/runs/<run_id>/report.md` |
+| `GET` | `/api/multiplayer` |
 | `GET` | `/api/multiplayer/status` |
+| `WS` | `/api/multiplayer` |
 | `GET` | `/.well-known/prg32-store.json` |
 
 `POST /api/publish` accepts `multipart/form-data` with:
@@ -129,7 +167,7 @@ curl -X POST http://127.0.0.1:5080/api/runs \
 
 curl -X POST http://127.0.0.1:5080/api/metrics/batch \
   -H 'Content-Type: application/json' \
-  -d '{"run_id":"demo","samples":[]}'
+  -d '{"run_id":"demo","samples":[{"frame":1,"frame_us":23500}]}'
 ```
 
 Useful URLs:
@@ -138,6 +176,17 @@ Useful URLs:
 - `http://127.0.0.1:5080/api/runs/demo`
 - `http://127.0.0.1:5080/api/runs/demo/samples.csv`
 - `http://127.0.0.1:5080/api/runs/demo/report.md`
+
+Export one metrics run:
+
+```bash
+python -m cartridge_store.export_run demo \
+  --db data/cartrige_store.sqlite \
+  --out metrics_export/demo
+```
+
+The export directory contains metadata JSON, sample CSV, summary CSV, a LaTeX
+summary table, a Markdown report, and plots when `matplotlib` is available.
 
 ## Multiplayer
 
@@ -172,6 +221,8 @@ change the per-signature room limit.
 - Multiplayer rooms are isolated by path-safe cartridge signatures.
 - The game colophon is shown after the cartridge is activated, before the player
   starts a new play.
+- Score, metrics, and multiplayer APIs keep the legacy request and response
+  contracts from the archived standalone servers.
 
 ## Tests
 

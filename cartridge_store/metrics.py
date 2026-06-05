@@ -5,12 +5,13 @@ from __future__ import annotations
 import csv
 import io
 import time
-from statistics import mean, median
 from typing import Any
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, current_app, jsonify, request
 
-from .database import get_db
+from .auth import current_principal, require_role
+from .database import add_column_if_missing, get_db
+from .metrics_report import generate_markdown_report, list_runs, summarize_samples
 
 
 METRICS_SCHEMA = """
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at INTEGER NOT NULL,
     finished_at INTEGER,
     dropped_samples INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    submitted_by TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS samples (
@@ -56,6 +58,7 @@ CREATE INDEX IF NOT EXISTS samples_run_frame_time_idx ON samples(run_id, frame_u
 def init_metrics_db() -> None:
     db = get_db()
     db.executescript(METRICS_SCHEMA)
+    add_column_if_missing(db, "runs", "submitted_by", "TEXT NOT NULL DEFAULT ''")
     db.commit()
 
 
@@ -74,57 +77,8 @@ def _int_value(data: dict[str, Any], key: str, default: int = 0, minimum: int = 
     return max(value, minimum)
 
 
-def _row_dict(row) -> dict[str, Any] | None:
+def _row_dict(row: Any | None) -> dict[str, Any] | None:
     return dict(row) if row else None
-
-
-def _quantile(values: list[int], q: float) -> float:
-    if not values:
-        return 0.0
-    if len(values) == 1:
-        return float(values[0])
-    ordered = sorted(values)
-    pos = (len(ordered) - 1) * q
-    low = int(pos)
-    high = min(low + 1, len(ordered) - 1)
-    frac = pos - low
-    return float(ordered[low] * (1.0 - frac) + ordered[high] * frac)
-
-
-def summarize_samples(samples: list[dict[str, Any]]) -> dict[str, Any]:
-    frame_times = [int(sample["frame_us"]) for sample in samples]
-    update_times = [int(sample["update_us"]) for sample in samples]
-    draw_times = [int(sample["draw_us"]) for sample in samples]
-    present_times = [int(sample["present_us"]) for sample in samples]
-    missed = sum(1 for sample in samples if int(sample["deadline_missed"]))
-    fps_values = [int(sample["fps_x100"]) / 100.0 for sample in samples]
-
-    if not frame_times:
-        return {
-            "sample_count": 0,
-            "frame_us_avg": 0.0,
-            "frame_us_median": 0.0,
-            "frame_us_p95": 0.0,
-            "frame_us_max": 0,
-            "update_us_avg": 0.0,
-            "draw_us_avg": 0.0,
-            "present_us_avg": 0.0,
-            "fps_avg": 0.0,
-            "deadline_missed": 0,
-        }
-
-    return {
-        "sample_count": len(samples),
-        "frame_us_avg": mean(frame_times),
-        "frame_us_median": median(frame_times),
-        "frame_us_p95": _quantile(frame_times, 0.95),
-        "frame_us_max": max(frame_times),
-        "update_us_avg": mean(update_times),
-        "draw_us_avg": mean(draw_times),
-        "present_us_avg": mean(present_times),
-        "fps_avg": mean(fps_values) if fps_values else 0.0,
-        "deadline_missed": missed,
-    }
 
 
 def _samples_for_run(run_id: str) -> list[dict[str, Any]]:
@@ -142,69 +96,31 @@ def _samples_for_run(run_id: str) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def list_runs() -> list[dict[str, Any]]:
-    rows = get_db().execute(
-        """
-        SELECT runs.*,
-               COUNT(samples.id) AS sample_count
-        FROM runs
-        LEFT JOIN samples ON samples.run_id = runs.run_id
-        GROUP BY runs.run_id
-        ORDER BY runs.created_at DESC
-        """
-    ).fetchall()
-    return [dict(row) for row in rows]
-
-
-def generate_markdown_report(run_id: str) -> str:
-    run = _row_dict(
-        get_db().execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-    )
-    if not run:
-        return f"# PRG32 Metrics Report\n\nRun `{run_id}` was not found.\n"
-
-    samples = _samples_for_run(run_id)
-    summary = summarize_samples(samples)
-    dropped = int(run.get("dropped_samples") or 0)
-    deadline_pct = 0.0
-    if summary["sample_count"]:
-        deadline_pct = 100.0 * summary["deadline_missed"] / summary["sample_count"]
-
-    lines = [
-        "# PRG32 Metrics Report",
-        "",
-        f"- Run: `{run_id}`",
-        f"- Board: `{run['board_id']}`",
-        f"- Target: `{run['target']}`",
-        f"- Display: `{run['display_backend']}`",
-        f"- Firmware: `{run['firmware_version']}` (`{run['firmware_git_sha']}`)",
-        f"- Game: `{run['game_name']}`",
-        f"- Sample period: {run['sample_period_frames']} frame(s)",
-        f"- Dropped samples: {dropped}",
-        "",
-        "| Metric | Value |",
-        "|---|---:|",
-        f"| Samples | {summary['sample_count']} |",
-        f"| Average frame work | {summary['frame_us_avg']:.1f} us |",
-        f"| Median frame work | {summary['frame_us_median']:.1f} us |",
-        f"| p95 frame work | {summary['frame_us_p95']:.1f} us |",
-        f"| Max frame work | {summary['frame_us_max']} us |",
-        f"| Average update | {summary['update_us_avg']:.1f} us |",
-        f"| Average draw | {summary['draw_us_avg']:.1f} us |",
-        f"| Average present | {summary['present_us_avg']:.1f} us |",
-        f"| Average active FPS | {summary['fps_avg']:.2f} |",
-        f"| Deadline misses | {summary['deadline_missed']} ({deadline_pct:.1f}%) |",
-        "",
-    ]
-    return "\n".join(lines)
-
-
 def register_metrics_routes(app: Flask) -> None:
     @app.before_request
     def before_metrics_request() -> None:
         init_metrics_db()
 
+    @app.get("/api/metrics")
+    def metrics_index():
+        return jsonify(
+            {
+                "ok": True,
+                "service": "PRG32 metrics",
+                "endpoints": [
+                    "POST /api/runs",
+                    "POST /api/metrics/batch",
+                    "POST /api/runs/<run_id>/finish",
+                    "GET /api/runs",
+                    "GET /api/runs/<run_id>",
+                    "GET /api/runs/<run_id>/samples.csv",
+                    "GET /api/runs/<run_id>/report.md",
+                ],
+            }
+        )
+
     @app.post("/api/runs")
+    @require_role("player")
     def create_run():
         data = request.get_json(silent=True) or {}
         run_id = _clean_text(data, "run_id", 96)
@@ -223,17 +139,20 @@ def register_metrics_routes(app: Flask) -> None:
             "game_name": _clean_text(data, "game_name", 40),
             "sample_period_frames": _int_value(data, "sample_period_frames", 1, 1),
             "started_at": _int_value(data, "started_ms", int(time.time() * 1000), 0),
+            "submitted_by": current_principal().name,
         }
 
         get_db().execute(
             """
             INSERT INTO runs(
                 run_id, board_id, target, display_backend, firmware_version,
-                firmware_git_sha, game_name, sample_period_frames, started_at
+                firmware_git_sha, game_name, sample_period_frames, started_at,
+                submitted_by
             )
             VALUES (
                 :run_id, :board_id, :target, :display_backend, :firmware_version,
-                :firmware_git_sha, :game_name, :sample_period_frames, :started_at
+                :firmware_git_sha, :game_name, :sample_period_frames, :started_at,
+                :submitted_by
             )
             ON CONFLICT(run_id) DO UPDATE SET
                 board_id = excluded.board_id,
@@ -243,7 +162,8 @@ def register_metrics_routes(app: Flask) -> None:
                 firmware_git_sha = excluded.firmware_git_sha,
                 game_name = excluded.game_name,
                 sample_period_frames = excluded.sample_period_frames,
-                started_at = excluded.started_at
+                started_at = excluded.started_at,
+                submitted_by = excluded.submitted_by
             """,
             record,
         )
@@ -251,6 +171,7 @@ def register_metrics_routes(app: Flask) -> None:
         return jsonify({"ok": True, "run_id": run_id})
 
     @app.post("/api/metrics/batch")
+    @require_role("player")
     def create_batch():
         data = request.get_json(silent=True) or {}
         run_id = _clean_text(data, "run_id", 96)
@@ -310,6 +231,7 @@ def register_metrics_routes(app: Flask) -> None:
         return jsonify({"ok": True, "inserted": inserted, "received": len(samples)})
 
     @app.post("/api/runs/<run_id>/finish")
+    @require_role("player")
     def finish_run(run_id: str):
         data = request.get_json(silent=True) or {}
         finished_at = _int_value(data, "finished_ms", int(time.time() * 1000), 0)
@@ -330,7 +252,7 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs")
     def runs():
-        return jsonify(list_runs())
+        return jsonify(list_runs(current_app.config["DATABASE"]))
 
     @app.get("/api/runs/<run_id>")
     def run_detail(run_id: str):
@@ -369,6 +291,6 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs/<run_id>/report.md")
     def report_md(run_id: str):
-        text = generate_markdown_report(run_id)
+        text = generate_markdown_report(current_app.config["DATABASE"], run_id)
         status = 200 if "was not found" not in text else 404
         return Response(text, status=status, mimetype="text/markdown")

@@ -78,6 +78,7 @@ class GameStore:
         parsed: fmt.CartridgeImage,
         *,
         architecture: str,
+        publisher: str | None = None,
     ) -> dict[str, Any]:
         if parsed.metadata is None:
             raise StoreError("cartridge metadata trailer is missing META")
@@ -116,6 +117,8 @@ class GameStore:
                 "updated_at": now,
             }
         )
+        if publisher:
+            game["publisher"] = publisher
         versions = game.setdefault("versions", {})
         version_rec = versions.setdefault(
             version,
@@ -132,8 +135,10 @@ class GameStore:
                 "updated_at": now,
             }
         )
+        if publisher:
+            version_rec["published_by"] = publisher
         rel = cart_path.relative_to(self.data_dir).as_posix()
-        version_rec.setdefault("architectures", {})[architecture] = {
+        variant = {
             "architecture": architecture,
             "filename": rel,
             "size": len(image),
@@ -145,6 +150,9 @@ class GameStore:
             "has_signature": parsed.signature is not None,
             "updated_at": now,
         }
+        if publisher:
+            variant["published_by"] = publisher
+        version_rec.setdefault("architectures", {})[architecture] = variant
         self.save_index(index)
         return self.public_game(game_id, version=version)
 
@@ -183,6 +191,7 @@ class GameStore:
             "metadata": version_rec.get("metadata"),
             "colophon": version_rec.get("colophon"),
             "variants": architectures,
+            "publisher": version_rec.get("published_by") or game.get("publisher", ""),
             "updated_at": game.get("updated_at"),
         }
 
