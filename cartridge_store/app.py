@@ -1,4 +1,4 @@
-"""Flask PWA for the PRG32 Cartrige Store."""
+"""Flask PWA for the PRG32 Cartridge Store."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "PRG32_SCORE_DB",
             os.environ.get(
                 "PRG32_METRICS_DB",
-                str(Path(data_dir) / "cartrige_store.sqlite"),
+                str(Path(data_dir) / "cartridge_store.sqlite"),
             ),
         ),
     )
@@ -88,7 +88,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     if test_config and test_config.get("SECRET_KEY"):
         secret_key = str(test_config["SECRET_KEY"])
     if not secret_key and not (test_config and test_config.get("TESTING")):
-        message = "SECRET_KEY must be set before starting PRG32 Cartrige Store"
+        message = "SECRET_KEY must be set before starting PRG32 Cartridge Store"
         print(message, file=sys.stderr)
         raise RuntimeError(message)
     if not secret_key:
@@ -100,7 +100,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         MAX_CONTENT_LENGTH=DEFAULT_MAX_UPLOAD,
         BUNDLE_MAX_CONTENT_LENGTH=int(os.environ.get("PRG32_BUNDLE_MAX_MB", "64")) * 1024 * 1024,
         MULTIPLAYER_MAX_PEERS=int(os.environ.get("PRG32_MP_MAX_PEERS", "8")),
-        STORE_NAME="PRG32 Cartrige Store",
+        STORE_NAME="PRG32 Cartridge Store",
         STORE_VERSION="1.0.0",
         USERS=None,
         SECRET_KEY=secret_key,
@@ -109,7 +109,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         app.config.update(test_config)
         if "DATABASE" not in test_config:
             app.config["DATABASE"] = str(
-                Path(app.config["DATA_DIR"]) / "cartrige_store.sqlite"
+                Path(app.config["DATA_DIR"]) / "cartridge_store.sqlite"
             )
     if not app.config.get("SERVICES_DB"):
         app.config["SERVICES_DB"] = app.config["DATABASE"]
@@ -416,7 +416,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             archive,
             mimetype="application/zip",
             as_attachment=True,
-            download_name="prg32-cartrige-store-backup.zip",
+            download_name="prg32-cartridge-store-backup.zip",
         )
 
     @app.post("/admin/backup/restore")
@@ -710,7 +710,7 @@ def _create_backup_archive(store: GameStore) -> str:
                 "manifest.json",
                 json.dumps(
                     {
-                        "abi": "prg32-cartrige-store-backup-1.0",
+                        "abi": "prg32-cartridge-store-backup-1.0",
                         "database": "database.sqlite",
                         "data_dir": "data/",
                     },

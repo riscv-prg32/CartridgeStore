@@ -9,14 +9,14 @@ This file applies to the whole repository. Follow it unless a more specific
 
 ## Project Context
 
-PRG32 Cartrige Store is the classroom service for PRG32 cartridges. It hosts:
+PRG32 Cartridge Store is the classroom service for PRG32 cartridges. It hosts:
 
 - a Flask/PWA catalog for `.prg32` cartridge artifacts;
 - the ScoreServer-compatible `/api/scores` leaderboard API;
 - the MetricsServer-compatible `/api/runs` and `/api/metrics/batch` receiver;
 - the MultiplayerServer-compatible WebSocket relay at `/api/multiplayer`.
 
-The service name is intentionally **Cartrige Store**. The file format remains
+The service name is intentionally **Cartridge Store**. The file format remains
 PRG32 "cartridge" terminology.
 
 Preserve the educational character of the project: prefer readable, explicit
@@ -40,7 +40,7 @@ and keep setup instructions reproducible.
 ## Naming Rules
 
 - Use `PRG32` for the platform name.
-- Use `Cartrige Store` for the server/product name.
+- Use `Cartridge Store` for the server/product name.
 - Use `cartridge` for `.prg32` file terminology.
 - Keep public metadata ABI names stable:
   - `prg32-metadata-1.0`
@@ -119,7 +119,7 @@ already-installed `zeroconf` library:
 
 - Service type: `_prg32store._tcp`
 - Port: 5080, or `PRG32_STORE_PORT` if overridden
-- Instance name: configured `store_name` setting, default `PRG32 Cartrige Store`
+- Instance name: configured `store_name` setting, default `PRG32 Cartridge Store`
 - TXT record: `abi=prg32-store-discovery-1.0`
 
 Deregister cleanly on shutdown. Guard registration and deregistration so mDNS
@@ -151,7 +151,7 @@ For Docker changes, also run when Docker is available:
 
 ```bash
 docker compose config
-docker build -t prg32-cartrige-store:local .
+docker build -t prg32-cartridge-store:local .
 ```
 
 If Docker or network access is unavailable, say so clearly.

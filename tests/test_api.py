@@ -250,5 +250,5 @@ def test_discovery_document(client) -> None:
     assert response.status_code == 200
     body = response.get_json()
     assert body["abi"] == "prg32-store-discovery-1.0"
-    assert body["name"] == "PRG32 Cartrige Store"
+    assert body["name"] == "PRG32 Cartridge Store"
     assert body["services"]["bundle_publish"].endswith("/api/publish/bundle")

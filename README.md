@@ -36,9 +36,9 @@ Open <http://127.0.0.1:5080/>.
 
 Set `PRG32_STORE_DATA=/path/to/data` to move filesystem storage. By default the
 store writes cartridges to `data/cartridges`, the extracted index to
-`data/index.json`, and service data to `data/cartrige_store.sqlite`.
+`data/index.json`, and service data to `data/cartridge_store.sqlite`.
 
-Set `PRG32_STORE_DB=/path/to/cartrige_store.sqlite` to choose a different
+Set `PRG32_STORE_DB=/path/to/cartridge_store.sqlite` to choose a different
 SQLite database. Legacy `PRG32_SCORE_DB` and `PRG32_METRICS_DB` environment
 variables are also honored when `PRG32_STORE_DB` is not set.
 
@@ -151,7 +151,7 @@ Export one metrics run:
 
 ```bash
 python -m cartridge_store.export_run demo \
-  --db data/cartrige_store.sqlite \
+  --db data/cartridge_store.sqlite \
   --out metrics_export/demo
 ```
 
@@ -161,7 +161,7 @@ summary table, a Markdown report, and plots when `matplotlib` is available.
 ## Multiplayer
 
 The multiplayer relay keeps the standalone MultiplayerServer JSON protocol, but
-runs on the same Cartrige Store service:
+runs on the same Cartridge Store service:
 
 ```text
 ws://127.0.0.1:5080/api/multiplayer

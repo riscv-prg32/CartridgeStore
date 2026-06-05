@@ -84,7 +84,7 @@ def _mdns_settings(app: Flask) -> dict[str, str]:
 
 
 def _local_hostname() -> str:
-    hostname = socket.gethostname().split(".")[0] or "prg32-cartrige-store"
+    hostname = socket.gethostname().split(".")[0] or "prg32-cartridge-store"
     return f"{hostname}.local."
 
 

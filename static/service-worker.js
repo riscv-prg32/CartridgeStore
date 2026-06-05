@@ -1,4 +1,4 @@
-const CACHE_NAME = "prg32-cartrige-store-v1";
+const CACHE_NAME = "prg32-cartridge-store-v1";
 const SHELL = [
   "/",
   "/publish",

@@ -1,4 +1,4 @@
-"""Shared SQLite helpers for Cartrige Store service data."""
+"""Shared SQLite helpers for Cartridge Store service data."""
 
 from __future__ import annotations
 

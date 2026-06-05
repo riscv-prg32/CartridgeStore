@@ -626,9 +626,9 @@ def _send_registration_email(email: str, link: str) -> None:
     message = EmailMessage()
     message["From"] = sender
     message["To"] = email
-    message["Subject"] = "Complete your PRG32 Cartrige Store registration"
+    message["Subject"] = "Complete your PRG32 Cartridge Store registration"
     message.set_content(
-        "Open this link to finish your PRG32 Cartrige Store registration:\n\n"
+        "Open this link to finish your PRG32 Cartridge Store registration:\n\n"
         f"{link}\n\n"
         "The link expires in 24 hours.\n"
     )

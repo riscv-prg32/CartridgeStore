@@ -1,6 +1,6 @@
 # Unified Service API
 
-PRG32 Cartrige Store combines cartridge catalog, score, metrics, multiplayer,
+PRG32 Cartridge Store combines cartridge catalog, score, metrics, multiplayer,
 authentication, and statistics contracts on one host.
 
 ## Discovery

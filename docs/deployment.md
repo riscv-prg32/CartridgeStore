@@ -1,6 +1,6 @@
 # Deployment
 
-PRG32 Cartrige Store should run behind HTTPS in production, with persistent
+PRG32 Cartridge Store should run behind HTTPS in production, with persistent
 storage mounted outside the container or process directory.
 
 ## Environment Variables
@@ -9,7 +9,7 @@ storage mounted outside the container or process directory.
 | --- | --- | --- |
 | `SECRET_KEY` | required | Flask session signing key |
 | `PRG32_STORE_DATA` | `data` or `/data` in Docker | Cartridge files, custom static assets, and default DB location |
-| `PRG32_STORE_DB` | `<data>/cartrige_store.sqlite` | Unified SQLite database |
+| `PRG32_STORE_DB` | `<data>/cartridge_store.sqlite` | Unified SQLite database |
 | `PRG32_SCORE_DB` | unset | Legacy score DB fallback |
 | `PRG32_METRICS_DB` | unset | Legacy metrics DB fallback |
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
@@ -22,8 +22,8 @@ storage mounted outside the container or process directory.
 | `PRG32_SMTP_PASSWORD` | unset | SMTP password |
 | `PRG32_SMTP_TLS` | `true` | Enable STARTTLS for SMTP |
 | `PRG32_MDNS_DISABLED` | unset | Set to `1` to disable mDNS advertisement |
-| `PRG32_MDNS_NAME` | `PRG32 Cartrige Store` | mDNS instance name |
-| `PRG32_MDNS_TYPE` | `_http._tcp.local.` | mDNS service type |
+| `PRG32_MDNS_NAME` | `PRG32 Cartridge Store` | mDNS instance name |
+| `PRG32_MDNS_TYPE` | `_prg32store._tcp.local.` | mDNS service type |
 | `PRG32_MDNS_PORT` | `5080` | mDNS advertised HTTP port |
 | `PRG32_LDAP_URL` | unset | LDAP activation URL |
 | `PRG32_LDAP_BASE_DN` | unset | LDAP search base |
@@ -54,7 +54,7 @@ storage mounted outside the container or process directory.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
 - Put the service behind HTTPS termination.
 - Preserve `PRG32_STORE_DATA` on durable storage.
-- Use `/admin/backup` for full backups, or back up `cartrige_store.sqlite`,
+- Use `/admin/backup` for full backups, or back up `cartridge_store.sqlite`,
   `index.json`, `cartridges/`, custom static assets, and pending submissions
   under `pending/`.
 - Configure reverse-proxy request size limits above `PRG32_BUNDLE_MAX_MB`.

@@ -1,4 +1,4 @@
-"""Filesystem storage for the PRG32 Cartrige Store."""
+"""Filesystem storage for the PRG32 Cartridge Store."""
 
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ from .metrics_report import generate_markdown_report, load_run, load_samples, su
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB = Path(os.environ.get("PRG32_STORE_DB", ROOT / "data" / "cartrige_store.sqlite"))
+DEFAULT_DB = Path(os.environ.get("PRG32_STORE_DB", ROOT / "data" / "cartridge_store.sqlite"))
 
 
 def write_samples_csv(path: Path, samples: list[dict]) -> None:

@@ -65,7 +65,7 @@ def test_mdns_registers_prg32_service(tmp_path, monkeypatch) -> None:
     app = create_app({"TESTING": False, "DATA_DIR": str(tmp_path / "data")})
 
     assert registered["service_type"] == "_prg32store._tcp.local."
-    assert registered["name"] == "PRG32 Cartrige Store._prg32store._tcp.local."
+    assert registered["name"] == "PRG32 Cartridge Store._prg32store._tcp.local."
     assert registered["port"] == 5080
     assert registered["properties"] == {"abi": "prg32-store-discovery-1.0"}
     pair = app.extensions["prg32_mdns"]
@@ -490,7 +490,7 @@ def test_setup_mdns_smtp_and_federated_auth_options(tmp_path) -> None:
             "publish_allowed_architectures": "qemu,esp32c6",
             "mdns_enabled": "true",
             "mdns_name": "Lab Store",
-            "mdns_type": "_http._tcp.local.",
+            "mdns_type": "_prg32store._tcp.local.",
             "mdns_port": "5080",
             "smtp_tls": "true",
             "smtp_host": "smtp.example.edu",

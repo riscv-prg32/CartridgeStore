@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the PRG32 Cartrige Store development server."""
+"""Run the PRG32 Cartridge Store development server."""
 
 from cartridge_store import create_app
 

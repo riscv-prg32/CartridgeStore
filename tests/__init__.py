@@ -1,1 +1,1 @@
-"""Tests for the PRG32 Cartrige Store."""
+"""Tests for the PRG32 Cartridge Store."""

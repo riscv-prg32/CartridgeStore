@@ -3,7 +3,7 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PRG32_STORE_DATA=/data
-ENV PRG32_STORE_DB=/data/cartrige_store.sqlite
+ENV PRG32_STORE_DB=/data/cartridge_store.sqlite
 
 WORKDIR /app
 

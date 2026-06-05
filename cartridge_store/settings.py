@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
 """
 
 DEFAULT_SETTINGS = {
-    "store_name": "PRG32 Cartrige Store",
+    "store_name": "PRG32 Cartridge Store",
     "store_tagline": "",
     "store_contact_email": "",
     "store_institution": "",

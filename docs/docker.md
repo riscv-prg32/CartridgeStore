@@ -29,7 +29,7 @@ The container uses:
 
 ```text
 PRG32_STORE_DATA=/data
-PRG32_STORE_DB=/data/cartrige_store.sqlite
+PRG32_STORE_DB=/data/cartridge_store.sqlite
 ```
 
 This keeps uploaded cartridges, pending review packages, the catalog index,
@@ -38,7 +38,7 @@ scores, and metrics outside the container image.
 ## Build Only
 
 ```bash
-docker build -t prg32-cartrige-store:local .
+docker build -t prg32-cartridge-store:local .
 ```
 
 Run the image manually:
@@ -49,8 +49,8 @@ docker run --rm \
   -v "$PWD/data:/data" \
   -e SECRET_KEY="$SECRET_KEY" \
   -e PRG32_STORE_DATA=/data \
-  -e PRG32_STORE_DB=/data/cartrige_store.sqlite \
-  prg32-cartrige-store:local
+  -e PRG32_STORE_DB=/data/cartridge_store.sqlite \
+  prg32-cartridge-store:local
 ```
 
 Database users are the primary auth path. The image seeds `admin` / `password`
@@ -79,7 +79,7 @@ The discovery document is available at:
 http://<host-ip>:5080/.well-known/prg32-store.json
 ```
 
-The service advertises itself via mDNS as `_http._tcp.local.`. Set
+The service advertises itself via mDNS as `_prg32store._tcp.local.`. Set
 `PRG32_MDNS_DISABLED=1` to turn that off, or `PRG32_MDNS_NAME` to change the
 advertised name.
 

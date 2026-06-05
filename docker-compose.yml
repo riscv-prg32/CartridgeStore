@@ -1,14 +1,14 @@
 services:
-  cartrige-store:
+  cartridge-store:
     build: .
-    image: riscv-prg32/cartrige-store:local
-    container_name: prg32-cartrige-store
+    image: riscv-prg32/cartridge-store:local
+    container_name: prg32-cartridge-store
     ports:
       - "5080:5080"
     environment:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
       PRG32_STORE_DATA: /data
-      PRG32_STORE_DB: /data/cartrige_store.sqlite
+      PRG32_STORE_DB: /data/cartridge_store.sqlite
       PRG32_MP_MAX_PEERS: "8"
     volumes:
       - ./data:/data

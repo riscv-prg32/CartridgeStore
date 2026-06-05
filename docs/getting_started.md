@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide creates a consistent PRG32 Cartrige Store environment for local
+This guide creates a consistent PRG32 Cartridge Store environment for local
 development, classroom demos, and quick service validation.
 
 ## Requirements
@@ -31,13 +31,13 @@ python -m pip install -r requirements.txt
 ```bash
 mkdir -p data
 export PRG32_STORE_DATA="$PWD/data"
-export PRG32_STORE_DB="$PWD/data/cartrige_store.sqlite"
+export PRG32_STORE_DB="$PWD/data/cartridge_store.sqlite"
 ```
 
 The directory stores uploaded cartridges under `data/cartridges`, custom theme
 assets under `data/static`, pending review packages under `data/pending`, the
 catalog index in `data/index.json`, and service tables in
-`data/cartrige_store.sqlite`.
+`data/cartridge_store.sqlite`.
 
 ## First-Run Setup
 
@@ -165,7 +165,7 @@ Set these variables to send registration links by SMTP:
 export PRG32_SMTP_HOST=smtp.example.edu
 export PRG32_SMTP_PORT=587
 export PRG32_SMTP_FROM=noreply@example.edu
-export PRG32_SMTP_USER=cartrige-store
+export PRG32_SMTP_USER=cartridge-store
 export PRG32_SMTP_PASSWORD=secret
 ```
 

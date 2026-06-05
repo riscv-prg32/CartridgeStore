@@ -1,6 +1,6 @@
 # Operations
 
-This page collects day-to-day operational notes for running PRG32 Cartrige
+This page collects day-to-day operational notes for running PRG32 Cartridge
 Store in a lab or classroom.
 
 ## Backups
@@ -23,7 +23,7 @@ the SQLite database, scores, and metrics.
 To create a simple archive:
 
 ```bash
-tar -czf cartrige-store-data.tgz data
+tar -czf cartridge-store-data.tgz data
 ```
 
 ## Restore
@@ -41,7 +41,7 @@ docker compose down
 Restore the data directory, then start again:
 
 ```bash
-tar -xzf cartrige-store-data.tgz
+tar -xzf cartridge-store-data.tgz
 docker compose up -d
 ```
 
@@ -111,7 +111,7 @@ For local Python runs, logs are printed to the terminal that started the server.
 - Firmware score and metrics URLs use `http://<host-ip>:5080`.
 - Firmware multiplayer URLs use `ws://<host-ip>:5080/api/multiplayer`.
 - The discovery document returns reachable URLs for the client network.
-- mDNS advertises `_http._tcp.local.` when `zeroconf` is installed.
+- mDNS advertises `_prg32store._tcp.local.` when `zeroconf` is installed.
 - Set `PRG32_MDNS_DISABLED=1` when the classroom network should not advertise.
 
 ## Data Reset

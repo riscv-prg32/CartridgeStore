@@ -1,4 +1,4 @@
-"""PRG32 Cartrige Store package."""
+"""PRG32 Cartridge Store package."""
 
 from __future__ import annotations
 
