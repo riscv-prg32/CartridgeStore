@@ -426,6 +426,20 @@ th {
   gap: 6px;
 }
 
+.inline-admin-form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inline-admin-form input,
+.inline-admin-form select {
+  min-width: 160px;
+  width: auto;
+}
+
 .action-cell select,
 .action-cell button {
   min-height: 34px;

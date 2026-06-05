@@ -16,7 +16,10 @@ log = logging.getLogger(__name__)
 def register_mdns(app: Flask) -> None:
     if app.config.get("TESTING"):
         return
+    values = _mdns_settings(app)
     if os.environ.get("PRG32_MDNS_DISABLED", "").lower() in {"1", "true", "yes"}:
+        return
+    if values["enabled"].lower() in {"0", "false", "no"}:
         return
     try:
         from zeroconf import ServiceInfo, Zeroconf
@@ -24,13 +27,13 @@ def register_mdns(app: Flask) -> None:
         log.warning("mDNS advertisement disabled because zeroconf is not installed: %s", exc)
         return
 
-    service_type = os.environ.get("PRG32_MDNS_TYPE", "_http._tcp.local.")
-    instance = os.environ.get("PRG32_MDNS_NAME", app.config["STORE_NAME"])
+    service_type = os.environ.get("PRG32_MDNS_TYPE", values["type"])
+    instance = os.environ.get("PRG32_MDNS_NAME", values["name"]) or app.config["STORE_NAME"]
     if not instance.endswith("." + service_type):
         service_name = f"{instance}.{service_type}"
     else:
         service_name = instance
-    port = int(os.environ.get("PRG32_MDNS_PORT", "5080"))
+    port = int(os.environ.get("PRG32_MDNS_PORT", values["port"]))
     addresses = _local_addresses()
     if not addresses:
         log.warning("mDNS advertisement disabled because no IPv4 address was found")
@@ -57,6 +60,27 @@ def register_mdns(app: Flask) -> None:
     app.extensions["prg32_mdns"] = {"zeroconf": zeroconf, "info": info}
     atexit.register(_close_mdns, zeroconf, info)
     log.info("Advertising %s via mDNS on port %s", service_name, port)
+
+
+def _mdns_settings(app: Flask) -> dict[str, str]:
+    values = {
+        "enabled": "true",
+        "name": app.config["STORE_NAME"],
+        "type": "_http._tcp.local.",
+        "port": "5080",
+    }
+    try:
+        from .settings import get_setting, init_settings_db
+
+        with app.app_context():
+            init_settings_db()
+            values["enabled"] = get_setting("mdns_enabled", values["enabled"])
+            values["name"] = get_setting("mdns_name", values["name"]) or app.config["STORE_NAME"]
+            values["type"] = get_setting("mdns_type", values["type"])
+            values["port"] = get_setting("mdns_port", values["port"])
+    except Exception as exc:  # pragma: no cover - startup fallback path
+        log.warning("mDNS setup values unavailable, using defaults: %s", exc)
+    return values
 
 
 def _local_hostname() -> str:

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Roles - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Roles</h1>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Level</th><th>Users</th></tr>
+    </thead>
+    <tbody>
+      {% for role in roles %}
+      <tr>
+        <td>{{ role.name }}</td>
+        <td>{{ role.level }}</td>
+        <td>{{ role.user_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

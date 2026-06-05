@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Cartridges - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Cartridges</h1>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Version</th><th>Metadata</th><th>Architectures</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for game in games %}
+      <tr>
+        <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}">
+          <td><a href="/games/{{ game.id }}">{{ game.id }}</a></td>
+          <td>{{ game.selected_version }}</td>
+          <td>
+            <input name="title" value="{{ game.title }}" required>
+            <input name="summary" value="{{ game.summary }}">
+            <input name="tags" value="{{ game.tags | join(', ') }}">
+          </td>
+          <td>{{ game.architectures | join(", ") }}</td>
+          <td class="action-cell">
+            <button type="submit">Save</button>
+        </form>
+            <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete">
+              <button type="submit">Delete Version</button>
+            </form>
+            {% for architecture in game.architectures %}
+            <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete">
+              <input type="hidden" name="architecture" value="{{ architecture }}">
+              <button type="submit">Delete {{ architecture }}</button>
+            </form>
+            {% endfor %}
+          </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import shutil
+import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
-import zipfile
 from copy import deepcopy
 from io import BytesIO
+import zipfile
 
 from flask import (
     Flask,
@@ -25,6 +29,7 @@ from flask import (
     send_file,
     url_for,
 )
+from werkzeug.security import generate_password_hash
 
 from . import charts, prg32_format as fmt
 from .auth import (
@@ -35,7 +40,7 @@ from .auth import (
     groups_for_user,
     login_required,
     register_auth_routes,
-    set_user_group,
+    set_user_groups,
 )
 from .database import close_db, get_db
 from .mdns import register_mdns
@@ -184,8 +189,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.post("/setup")
     @admin_required
     def setup_save():
+        checkbox_keys = {
+            "auth_allow_registration",
+            "publish_require_auth",
+            "mdns_enabled",
+            "smtp_tls",
+            "oidc_enabled",
+            "saml_enabled",
+        }
         for key in _settings_form_values():
-            if key in ("auth_allow_registration", "publish_require_auth"):
+            if key in checkbox_keys:
                 set_setting(key, "true" if request.form.get(key) else "false")
             else:
                 set_setting(key, request.form.get(key, DEFAULT_SETTINGS.get(key, "")))
@@ -215,7 +228,69 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         page = max(request.args.get("page", default=1, type=int), 1)
         per_page = 50
         rows = _admin_user_rows(per_page, (page - 1) * per_page)
-        return render_template("admin_users.html", users=rows, page=page)
+        return render_template(
+            "admin_users.html",
+            users=rows,
+            groups=_group_rows(),
+            roles=ROLE_LEVELS,
+            page=page,
+        )
+
+    @app.post("/admin/users")
+    @admin_required
+    def admin_user_create():
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        role = request.form.get("role", "user")
+        if role not in ROLE_LEVELS:
+            return jsonify({"ok": False, "error": "unknown role"}), 400
+        if not username or not email:
+            return jsonify({"ok": False, "error": "username and email are required"}), 400
+        db = get_db()
+        cursor = db.execute(
+            """
+            INSERT INTO users(username, email, password_hash, role)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                username,
+                email,
+                generate_password_hash(password or secrets.token_urlsafe(24)),
+                role,
+            ),
+        )
+        db.commit()
+        _set_groups_from_form(int(cursor.lastrowid))
+        return redirect(url_for("admin_users"))
+
+    @app.post("/admin/users/<int:user_id>")
+    @admin_required
+    def admin_user_update(user_id: int):
+        principal = current_principal()
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        role = request.form.get("role", "user")
+        password = request.form.get("password", "")
+        if role not in ROLE_LEVELS:
+            return jsonify({"ok": False, "error": "unknown role"}), 400
+        if user_id == principal.id and role != "admin":
+            return jsonify({"ok": False, "error": "admins cannot demote themselves"}), 400
+        if not username or not email:
+            return jsonify({"ok": False, "error": "username and email are required"}), 400
+        db = get_db()
+        db.execute(
+            "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?",
+            (username, email, role, user_id),
+        )
+        if password:
+            db.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (generate_password_hash(password), user_id),
+            )
+        db.commit()
+        _set_groups_from_form(user_id)
+        return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/role")
     @admin_required
@@ -224,18 +299,19 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         role = request.form.get("role", "user")
         if user_id == principal.id:
             return jsonify({"ok": False, "error": "admins cannot demote themselves"}), 400
-        if role not in ("user", "admin"):
-            return jsonify({"ok": False, "error": "role must be user or admin"}), 400
+        if role not in ROLE_LEVELS:
+            return jsonify({"ok": False, "error": "unknown role"}), 400
         _set_user_role(user_id, role)
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/groups")
     @admin_required
     def admin_user_groups(user_id: int):
-        set_user_group(user_id, "editors", bool(request.form.get("editors")))
+        _set_groups_from_form(user_id)
         return redirect(url_for("admin_users"))
 
-    @app.route("/admin/users/<int:user_id>", methods=["DELETE", "POST"])
+    @app.delete("/admin/users/<int:user_id>")
+    @app.post("/admin/users/<int:user_id>/delete")
     @admin_required
     def admin_user_delete(user_id: int):
         principal = current_principal()
@@ -245,6 +321,113 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if request.method == "DELETE":
             return jsonify({"ok": deleted})
         return redirect(url_for("admin_users"))
+
+    @app.get("/admin/groups")
+    @admin_required
+    def admin_groups():
+        return render_template("admin_groups.html", groups=_group_rows())
+
+    @app.post("/admin/groups")
+    @admin_required
+    def admin_group_create():
+        name = request.form.get("name", "").strip().lower()
+        if not name:
+            return jsonify({"ok": False, "error": "group name is required"}), 400
+        get_db().execute("INSERT OR IGNORE INTO groups(name) VALUES (?)", (name,))
+        get_db().commit()
+        return redirect(url_for("admin_groups"))
+
+    @app.post("/admin/groups/<int:group_id>")
+    @admin_required
+    def admin_group_update(group_id: int):
+        name = request.form.get("name", "").strip().lower()
+        if not name:
+            return jsonify({"ok": False, "error": "group name is required"}), 400
+        get_db().execute("UPDATE groups SET name = ? WHERE id = ?", (name, group_id))
+        get_db().commit()
+        return redirect(url_for("admin_groups"))
+
+    @app.route("/admin/groups/<int:group_id>/delete", methods=["DELETE", "POST"])
+    @admin_required
+    def admin_group_delete(group_id: int):
+        get_db().execute("DELETE FROM user_groups WHERE group_id = ?", (group_id,))
+        cursor = get_db().execute("DELETE FROM groups WHERE id = ? AND name != 'editors'", (group_id,))
+        get_db().commit()
+        if request.method == "DELETE":
+            return jsonify({"ok": cursor.rowcount > 0})
+        return redirect(url_for("admin_groups"))
+
+    @app.get("/admin/roles")
+    @admin_required
+    def admin_roles():
+        return render_template("admin_roles.html", roles=_role_rows())
+
+    @app.get("/admin/cartridges")
+    def admin_cartridges():
+        principal = current_principal()
+        if not principal.authenticated:
+            return redirect(url_for("auth_login", next=request.full_path))
+        if principal.role != "admin" and "editors" not in principal.groups:
+            return render_template("error.html", error="editors group required"), 403
+        return render_template("admin_cartridges.html", games=store.list_games())
+
+    @app.post("/admin/cartridges/<game_id>/<version>")
+    def admin_cartridge_update(game_id: str, version: str):
+        principal = current_principal()
+        if not principal.authenticated:
+            return redirect(url_for("auth_login", next=request.full_path))
+        if principal.role != "admin" and "editors" not in principal.groups:
+            return render_template("error.html", error="editors group required"), 403
+        store.update_metadata(
+            game_id,
+            version,
+            title=request.form.get("title", ""),
+            summary=request.form.get("summary", ""),
+            tags=split_csv(request.form.get("tags", "")),
+        )
+        return redirect(url_for("admin_cartridges"))
+
+    @app.route("/admin/cartridges/<game_id>/<version>/delete", methods=["DELETE", "POST"])
+    def admin_cartridge_delete(game_id: str, version: str):
+        principal = current_principal()
+        if not principal.authenticated:
+            return redirect(url_for("auth_login", next=request.full_path))
+        if principal.role != "admin" and "editors" not in principal.groups:
+            return render_template("error.html", error="editors group required"), 403
+        store.delete_variant(
+            game_id,
+            version,
+            architecture=request.form.get("architecture") or request.args.get("architecture"),
+        )
+        if request.method == "DELETE":
+            return jsonify({"ok": True})
+        return redirect(url_for("admin_cartridges"))
+
+    @app.get("/admin/backup")
+    @admin_required
+    def admin_backup_page():
+        return render_template("admin_backup.html")
+
+    @app.get("/admin/backup/download")
+    @admin_required
+    def admin_backup_download():
+        archive = _create_backup_archive(store)
+        return send_file(
+            archive,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name="prg32-cartrige-store-backup.zip",
+        )
+
+    @app.post("/admin/backup/restore")
+    @admin_required
+    def admin_backup_restore():
+        upload = request.files.get("backup")
+        if upload is None or not upload.filename:
+            return jsonify({"ok": False, "error": "backup file is required"}), 400
+        _restore_backup_archive(store, upload.read())
+        flash("Backup restored.")
+        return redirect(url_for("admin_backup_page"))
 
     @app.get("/manifest.webmanifest")
     def manifest():
@@ -471,6 +654,114 @@ def _delete_user(user_id: int) -> bool:
     cursor = get_db().execute("DELETE FROM users WHERE id = ?", (user_id,))
     get_db().commit()
     return cursor.rowcount > 0
+
+
+def _set_groups_from_form(user_id: int) -> None:
+    groups = request.form.getlist("groups")
+    extra = request.form.get("extra_groups", "")
+    groups.extend(split_csv(extra))
+    set_user_groups(user_id, groups)
+
+
+def _group_rows() -> list[dict[str, Any]]:
+    rows = get_db().execute(
+        """
+        SELECT groups.id, groups.name, groups.created_at, COUNT(user_groups.user_id) AS user_count
+        FROM groups
+        LEFT JOIN user_groups ON user_groups.group_id = groups.id
+        GROUP BY groups.id
+        ORDER BY groups.name
+        """
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _role_rows() -> list[dict[str, Any]]:
+    rows = []
+    for role, level in ROLE_LEVELS.items():
+        count_row = get_db().execute(
+            "SELECT COUNT(*) AS count FROM users WHERE role = ?",
+            (role,),
+        ).fetchone()
+        rows.append({"name": role, "level": level, "user_count": int(count_row["count"])})
+    return rows
+
+
+def _create_backup_archive(store: GameStore) -> str:
+    fd, archive_name = tempfile.mkstemp(prefix="prg32-store-backup-", suffix=".zip")
+    os.close(fd)
+    db = get_db()
+    db.commit()
+    source_db = Path(current_app.config["DATABASE"])
+    data_dir = Path(current_app.config["DATA_DIR"])
+    with tempfile.NamedTemporaryFile(prefix="prg32-store-db-", suffix=".sqlite", delete=False) as db_copy:
+        copied_db = Path(db_copy.name)
+    with sqlite3.connect(source_db) as source, sqlite3.connect(copied_db) as target:
+        source.backup(target)
+    try:
+        with zipfile.ZipFile(archive_name, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(
+                "manifest.json",
+                json.dumps(
+                    {
+                        "abi": "prg32-cartrige-store-backup-1.0",
+                        "database": "database.sqlite",
+                        "data_dir": "data/",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+            )
+            archive.write(copied_db, "database.sqlite")
+            for path in data_dir.rglob("*"):
+                if path.is_file() and path.resolve() != source_db.resolve():
+                    archive.write(path, "data/" + path.relative_to(data_dir).as_posix())
+    finally:
+        copied_db.unlink(missing_ok=True)
+    return archive_name
+
+
+def _restore_backup_archive(store: GameStore, data: bytes) -> None:
+    data_dir = Path(current_app.config["DATA_DIR"])
+    db_path = Path(current_app.config["DATABASE"])
+    with tempfile.TemporaryDirectory(prefix="prg32-store-restore-") as tmp:
+        tmp_path = Path(tmp)
+        archive_path = tmp_path / "backup.zip"
+        archive_path.write_bytes(data)
+        with zipfile.ZipFile(archive_path) as archive:
+            names = set(archive.namelist())
+            if "database.sqlite" not in names:
+                raise StoreError("backup is missing database.sqlite")
+            _extract_backup(archive, tmp_path)
+        restored_db = tmp_path / "database.sqlite"
+        sqlite3.connect(restored_db).close()
+        close_db()
+        data_dir.mkdir(parents=True, exist_ok=True)
+        for child in data_dir.iterdir():
+            if child.resolve() == db_path.resolve():
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        restored_data = tmp_path / "data"
+        if restored_data.is_dir():
+            for child in restored_data.iterdir():
+                target = data_dir / child.name
+                if child.is_dir():
+                    shutil.copytree(child, target, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(child, target)
+        shutil.copy2(restored_db, db_path)
+
+
+def _extract_backup(archive: zipfile.ZipFile, destination: Path) -> None:
+    root = destination.resolve()
+    for member in archive.infolist():
+        target = (destination / member.filename).resolve()
+        if root != target and root not in target.parents:
+            raise StoreError("backup contains an unsafe path")
+        archive.extract(member, destination)
 
 
 def _scores_for_game(game_id: str, limit: int = 20) -> list[dict[str, Any]]:

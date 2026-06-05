@@ -40,6 +40,12 @@
       <a href="/api/games">API</a>
       {% if current_user.authenticated and current_user.role == "admin" %}
       <a href="/setup">Setup</a>
+      <a href="/admin/users">Users</a>
+      <a href="/admin/groups">Groups</a>
+      <a href="/admin/backup">Backup</a>
+      {% endif %}
+      {% if current_user.authenticated and (current_user.role == "admin" or "editors" in current_user.groups) %}
+      <a href="/admin/cartridges">Cartridges</a>
       {% endif %}
       {% if current_user.authenticated %}
       <form method="post" action="/auth/logout" class="nav-form"><button type="submit">Logout</button></form>

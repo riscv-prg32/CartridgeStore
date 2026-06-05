@@ -338,8 +338,71 @@ def groups_for_user(user_id: int) -> tuple[str, ...]:
     return tuple(str(row["name"]) for row in rows)
 
 
+def set_user_groups(user_id: int, groups: Iterable[str]) -> None:
+    normalized = sorted({str(group).strip().lower() for group in groups if str(group).strip()})
+    db = get_db()
+    db.execute("DELETE FROM user_groups WHERE user_id = ?", (user_id,))
+    for group in normalized:
+        db.execute(
+            "INSERT OR IGNORE INTO user_groups(user_id, group_id) VALUES (?, ?)",
+            (user_id, group_id(group)),
+        )
+    db.commit()
+
+
 def principal_in_group(principal: Principal, group: str) -> bool:
     return str(group).strip().lower() in principal.groups
+
+
+def upsert_external_user(
+    *,
+    provider: str,
+    external_id: str,
+    email: str,
+    username: str = "",
+    role: str = "user",
+) -> int:
+    provider = str(provider).strip().lower()
+    external_id = str(external_id).strip()
+    email = _normalize_email(email)
+    username = str(username or email or external_id).strip()
+    if not provider or not external_id or not email:
+        raise ValueError("provider, external_id, and email are required")
+    role = normalize_role(role)
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT id
+        FROM users
+        WHERE external_provider = ? AND external_id = ?
+        """,
+        (provider, external_id),
+    ).fetchone()
+    if row is None:
+        row = db.execute(
+            "SELECT id FROM users WHERE email = ? OR username = ?",
+            (email, username),
+        ).fetchone()
+    if row is None:
+        cursor = db.execute(
+            """
+            INSERT INTO users(username, email, role, external_provider, external_id)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (username, email, role, provider, external_id),
+        )
+        db.commit()
+        return int(cursor.lastrowid)
+    db.execute(
+        """
+        UPDATE users
+        SET email = ?, external_provider = ?, external_id = ?
+        WHERE id = ?
+        """,
+        (email, provider, external_id, int(row["id"])),
+    )
+    db.commit()
+    return int(row["id"])
 
 
 def authenticate_token(token: str, users: Iterable[Principal] | None = None) -> Principal:
@@ -539,15 +602,26 @@ def _send_registration_email(email: str, link: str) -> None:
             "token": link.rsplit("token=", 1)[-1],
         }
         return
-    host = os.environ.get("PRG32_SMTP_HOST", "").strip()
+    try:
+        from ..settings import get_setting
+
+        host = os.environ.get("PRG32_SMTP_HOST", get_setting("smtp_host", "")).strip()
+        port = int(os.environ.get("PRG32_SMTP_PORT", get_setting("smtp_port", "587")))
+        sender = os.environ.get("PRG32_SMTP_FROM", get_setting("smtp_from", "noreply@localhost"))
+        username = os.environ.get("PRG32_SMTP_USER", get_setting("smtp_user", ""))
+        password = os.environ.get("PRG32_SMTP_PASSWORD", get_setting("smtp_password", ""))
+        tls_default = get_setting("smtp_tls", "true")
+    except Exception:
+        host = os.environ.get("PRG32_SMTP_HOST", "").strip()
+        port = int(os.environ.get("PRG32_SMTP_PORT", "587"))
+        sender = os.environ.get("PRG32_SMTP_FROM", "noreply@localhost")
+        username = os.environ.get("PRG32_SMTP_USER", "")
+        password = os.environ.get("PRG32_SMTP_PASSWORD", "")
+        tls_default = "true"
     if not host:
         current_app.logger.warning("Registration link for %s: %s", email, link)
         return
-    port = int(os.environ.get("PRG32_SMTP_PORT", "587"))
-    sender = os.environ.get("PRG32_SMTP_FROM", "noreply@localhost")
-    username = os.environ.get("PRG32_SMTP_USER", "")
-    password = os.environ.get("PRG32_SMTP_PASSWORD", "")
-    use_tls = os.environ.get("PRG32_SMTP_TLS", "true").lower() not in {"0", "false", "no"}
+    use_tls = os.environ.get("PRG32_SMTP_TLS", tls_default).lower() not in {"0", "false", "no"}
 
     message = EmailMessage()
     message["From"] = sender

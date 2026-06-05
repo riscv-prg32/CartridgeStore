@@ -60,6 +60,53 @@
     </div>
   </section>
 
+  <section>
+    <h2>mDNS</h2>
+    <label class="check-row"><input name="mdns_enabled" type="checkbox" value="true" {% if settings.mdns_enabled == "true" %}checked{% endif %}> Advertise service with mDNS</label>
+    <div class="field-grid">
+      <label>Instance Name<input name="mdns_name" value="{{ settings.mdns_name }}"></label>
+      <label>Service Type<input name="mdns_type" value="{{ settings.mdns_type }}"></label>
+      <label>Port<input name="mdns_port" type="number" min="1" max="65535" value="{{ settings.mdns_port }}"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>SMTP</h2>
+    <label class="check-row"><input name="smtp_tls" type="checkbox" value="true" {% if settings.smtp_tls == "true" %}checked{% endif %}> Use STARTTLS</label>
+    <div class="field-grid">
+      <label>Host<input name="smtp_host" value="{{ settings.smtp_host }}"></label>
+      <label>Port<input name="smtp_port" type="number" min="1" max="65535" value="{{ settings.smtp_port }}"></label>
+      <label>From Address<input name="smtp_from" value="{{ settings.smtp_from }}"></label>
+      <label>Username<input name="smtp_user" value="{{ settings.smtp_user }}"></label>
+      <label>Password<input name="smtp_password" type="password" value="{{ settings.smtp_password }}"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>OpenID Connect</h2>
+    <label class="check-row"><input name="oidc_enabled" type="checkbox" value="true" {% if settings.oidc_enabled == "true" %}checked{% endif %}> Enable OIDC login</label>
+    <div class="field-grid">
+      <label>Issuer<input name="oidc_issuer" value="{{ settings.oidc_issuer }}"></label>
+      <label>Client ID<input name="oidc_client_id" value="{{ settings.oidc_client_id }}"></label>
+      <label>Client Secret<input name="oidc_client_secret" type="password" value="{{ settings.oidc_client_secret }}"></label>
+      <label>Scope<input name="oidc_scope" value="{{ settings.oidc_scope }}"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>SAML2</h2>
+    <label class="check-row"><input name="saml_enabled" type="checkbox" value="true" {% if settings.saml_enabled == "true" %}checked{% endif %}> Enable SAML2 login</label>
+    <div class="field-grid">
+      <label>SP Entity ID<input name="saml_entity_id" value="{{ settings.saml_entity_id }}"></label>
+      <label>ACS URL<input name="saml_acs_url" value="{{ settings.saml_acs_url }}"></label>
+      <label>SLS URL<input name="saml_sls_url" value="{{ settings.saml_sls_url }}"></label>
+      <label>IdP Entity ID<input name="saml_idp_entity_id" value="{{ settings.saml_idp_entity_id }}"></label>
+      <label>IdP SSO URL<input name="saml_idp_sso_url" value="{{ settings.saml_idp_sso_url }}"></label>
+      <label>IdP SLO URL<input name="saml_idp_slo_url" value="{{ settings.saml_idp_slo_url }}"></label>
+    </div>
+    <label>IdP X.509 Certificate<textarea name="saml_idp_x509cert">{{ settings.saml_idp_x509cert }}</textarea></label>
+  </section>
+
   <button class="primary" type="submit">Save Settings</button>
 </form>
 

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Backup - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="split">
+  <div>
+    <h1>Backup</h1>
+    <p>Export a full archive with settings, users, roles, groups, cartridges, scores, statistics, measurements, and metrics.</p>
+    <a class="button" href="/admin/backup/download">Download Backup</a>
+  </div>
+  <form method="post" action="/admin/backup/restore" enctype="multipart/form-data">
+    <h2>Restore</h2>
+    <label>Backup ZIP<input type="file" name="backup" accept=".zip,application/zip" required></label>
+    <button type="submit">Restore Backup</button>
+  </form>
+</section>
+{% endblock %}

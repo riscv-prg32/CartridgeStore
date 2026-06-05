@@ -415,6 +415,135 @@ def test_setup_theme_and_logo(tmp_path) -> None:
     assert oversized.status_code == 413
 
 
+def test_setup_mdns_smtp_and_federated_auth_options(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    saved = client.post(
+        "/setup",
+        data={
+            "store_name": "Class Store",
+            "theme_primary_color": "#123456",
+            "theme_secondary_color": "#654321",
+            "theme_font_family": "system-ui, sans-serif",
+            "theme_logo_url": "",
+            "theme_favicon_url": "",
+            "theme_custom_css": "",
+            "auth_allow_registration": "true",
+            "auth_default_role": "user",
+            "auth_require_email_domain": "",
+            "publish_require_auth": "true",
+            "publish_max_bundle_mb": "64",
+            "publish_allowed_architectures": "qemu,esp32c6",
+            "mdns_enabled": "true",
+            "mdns_name": "Lab Store",
+            "mdns_type": "_http._tcp.local.",
+            "mdns_port": "5080",
+            "smtp_tls": "true",
+            "smtp_host": "smtp.example.edu",
+            "smtp_port": "587",
+            "smtp_from": "store@example.edu",
+            "smtp_user": "store",
+            "smtp_password": "secret",
+            "oidc_enabled": "true",
+            "oidc_issuer": "https://idp.example.edu",
+            "oidc_client_id": "client",
+            "oidc_client_secret": "secret",
+            "oidc_scope": "openid email profile",
+            "saml_enabled": "true",
+            "saml_entity_id": "https://store.example.edu/auth/saml/metadata",
+            "saml_acs_url": "https://store.example.edu/auth/saml/acs",
+            "saml_sls_url": "",
+            "saml_idp_entity_id": "https://idp.example.edu/saml",
+            "saml_idp_sso_url": "https://idp.example.edu/sso",
+            "saml_idp_slo_url": "",
+            "saml_idp_x509cert": "CERT",
+        },
+    )
+
+    assert saved.status_code == 302
+    with sqlite3.connect(client.application.config["DATABASE"]) as db:
+        rows = dict(
+            db.execute(
+                """
+                SELECT key, value
+                FROM store_settings
+                WHERE key IN ('mdns_name', 'smtp_host', 'oidc_issuer', 'saml_idp_sso_url')
+                """
+            ).fetchall()
+        )
+    assert rows["mdns_name"] == "Lab Store"
+    assert rows["smtp_host"] == "smtp.example.edu"
+    assert rows["oidc_issuer"] == "https://idp.example.edu"
+    assert rows["saml_idp_sso_url"] == "https://idp.example.edu/sso"
+
+
+def test_admin_user_group_and_role_pages(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    assert client.post("/admin/groups", data={"name": "testers"}).status_code == 302
+    created = client.post(
+        "/admin/users",
+        data={
+            "username": "teacher",
+            "email": "teacher@example.edu",
+            "password": "longpassword",
+            "role": "publisher",
+            "groups": ["editors", "testers"],
+        },
+    )
+    assert created.status_code == 302
+    page = client.get("/admin/users")
+    assert page.status_code == 200
+    assert "teacher@example.edu" in page.text
+    assert client.get("/admin/groups").status_code == 200
+    assert client.get("/admin/roles").status_code == 200
+
+    with sqlite3.connect(client.application.config["DATABASE"]) as db:
+        db.row_factory = sqlite3.Row
+        rows = db.execute(
+            """
+            SELECT users.role, groups.name
+            FROM users
+            JOIN user_groups ON user_groups.user_id = users.id
+            JOIN groups ON groups.id = user_groups.group_id
+            WHERE users.username = 'teacher'
+            ORDER BY groups.name
+            """
+        ).fetchall()
+    assert [dict(row) for row in rows] == [
+        {"role": "publisher", "name": "editors"},
+        {"role": "publisher", "name": "testers"},
+    ]
+
+
+def test_admin_cartridge_crud_and_backup_restore(tmp_path) -> None:
+    client = make_client(tmp_path)
+    submission = upload_bundle(client)
+    verify_submission(client, submission.get_json()["submission_id"])
+
+    updated = client.post(
+        "/admin/cartridges/org.example.test/1.0.0",
+        data={"title": "Edited Game", "summary": "Changed", "tags": "lab, edit"},
+    )
+    assert updated.status_code == 302
+    assert client.get("/api/games/org.example.test").get_json()["game"]["title"] == "Edited Game"
+
+    backup = client.get("/admin/backup/download")
+    assert backup.status_code == 200
+
+    deleted = client.post("/admin/cartridges/org.example.test/1.0.0/delete")
+    assert deleted.status_code == 302
+    assert client.get("/api/games/org.example.test").status_code == 400
+
+    restored = client.post(
+        "/admin/backup/restore",
+        data={"backup": (io.BytesIO(backup.data), "backup.zip")},
+        content_type="multipart/form-data",
+    )
+    assert restored.status_code == 302
+    assert client.get("/api/games/org.example.test").get_json()["game"]["title"] == "Edited Game"
+
+
 def test_download_stats_and_stats_page(tmp_path) -> None:
     client = make_client(tmp_path)
     published = upload_bundle(client)

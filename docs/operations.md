@@ -5,7 +5,13 @@ Store in a lab or classroom.
 
 ## Backups
 
-Back up the configured data directory. With Docker Compose, that is:
+Administrators can download a full backup from `/admin/backup`. The ZIP
+contains a SQLite snapshot plus filesystem data for settings, users, roles,
+groups, cartridges, pending submissions, scores, statistics, measurements, and
+metrics.
+
+You can also back up the configured data directory. With Docker Compose, that
+is:
 
 ```text
 ./data
@@ -21,6 +27,10 @@ tar -czf cartrige-store-data.tgz data
 ```
 
 ## Restore
+
+Administrators can restore a ZIP created by `/admin/backup` from the same page.
+The restore replaces the SQLite database and filesystem data in the configured
+data directory.
 
 Stop the service:
 
@@ -67,6 +77,17 @@ password. Their username is the verified email address.
 Configure SMTP with `PRG32_SMTP_HOST`, `PRG32_SMTP_PORT`, `PRG32_SMTP_FROM`,
 `PRG32_SMTP_USER`, `PRG32_SMTP_PASSWORD`, and `PRG32_SMTP_TLS`. Without SMTP,
 registration links are logged for development.
+
+## Administration Pages
+
+- `/setup` controls identity, theme, publishing, mDNS, SMTP, OIDC, and SAML2.
+- `/admin/users` manages local and federated user records, roles, passwords,
+  and group membership.
+- `/admin/groups` manages groups; users can belong to many groups.
+- `/admin/roles` shows the fixed role ABI and user counts.
+- `/admin/cartridges` lets admins and editors edit descriptive cartridge
+  metadata or delete variants/versions.
+- `/admin/backup` exports and restores full backups.
 
 ## Access Tokens
 

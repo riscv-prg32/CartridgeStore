@@ -60,6 +60,10 @@ SMTP variables to send those links. Legacy `PRG32_USERS` tokens are still
 accepted for API clients, but database users in the `editors` group must verify
 pending cartridge packages.
 
+Use `/setup` to configure SMTP, mDNS, OpenID Connect, and SAML2 from the
+browser. Environment variables with matching `PRG32_*` names override saved
+setup values after restart.
+
 ## Classroom LAN Deployment
 
 Find the host computer IP address and point boards to:
@@ -78,6 +82,13 @@ http://<host-ip>:5080/.well-known/prg32-store.json
 The service advertises itself via mDNS as `_http._tcp.local.`. Set
 `PRG32_MDNS_DISABLED=1` to turn that off, or `PRG32_MDNS_NAME` to change the
 advertised name.
+
+## Backup and Restore
+
+Administrators can download and restore a full ZIP backup from `/admin/backup`.
+The archive includes the SQLite database and filesystem data mounted under
+`/data`, covering settings, users, roles, groups, cartridges, scores,
+statistics, measurements, and metrics.
 
 ## Maintenance
 

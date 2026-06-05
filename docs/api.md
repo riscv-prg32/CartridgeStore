@@ -32,6 +32,11 @@ email address.
 | `GET` | `/auth/me` | Current user JSON |
 | `POST` | `/auth/tokens` | Create a Bearer token |
 | `DELETE` | `/auth/tokens/<id>` | Revoke one of your tokens |
+| `GET` | `/auth/oidc/login` | Start OIDC login when configured |
+| `GET` | `/auth/oidc/callback` | OIDC callback when configured |
+| `GET` | `/auth/saml/login` | Start SAML2 login when configured |
+| `POST` | `/auth/saml/acs` | SAML2 assertion consumer when configured |
+| `GET` | `/auth/saml/metadata` | SAML2 service-provider metadata |
 
 Create a token:
 
@@ -59,7 +64,8 @@ Routes requiring auth:
 | `POST /api/submissions/<id>/reject` | `editors` group |
 | `POST /api/scores` | logged in or Bearer token |
 | `/setup`, `/setup/logo`, `/setup/favicon` | admin |
-| `/admin/*` | admin |
+| `/admin/users*`, `/admin/groups*`, `/admin/roles`, `/admin/backup*` | admin |
+| `/admin/cartridges*` | admin or `editors` group |
 | `/users/<username>/runs*` | owner or admin |
 
 Metrics ingestion remains compatible with existing clients. If a run is posted
@@ -70,6 +76,30 @@ but database users must belong to the `editors` group to verify submissions.
 
 Registration email delivery uses SMTP when `PRG32_SMTP_HOST` is configured. In
 development without SMTP, the verification link is logged.
+
+OIDC and SAML2 can be enabled from `/setup` or environment variables. On a
+successful federated login, the service creates or updates a local user with
+the external provider id and email address.
+
+## Administration
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/setup` | Edit store, auth, publish, mDNS, SMTP, OIDC, and SAML2 settings |
+| `GET/POST` | `/admin/users` | List and create users |
+| `POST` | `/admin/users/<id>` | Update username, email, role, password, and groups |
+| `DELETE` | `/admin/users/<id>` | Delete a user |
+| `POST` | `/admin/users/<id>/delete` | Browser delete fallback |
+| `GET/POST` | `/admin/groups` | List and create groups |
+| `POST` | `/admin/groups/<id>` | Rename a group |
+| `DELETE/POST` | `/admin/groups/<id>/delete` | Delete a group |
+| `GET` | `/admin/roles` | List fixed roles and user counts |
+| `GET` | `/admin/cartridges` | List cartridges for administration |
+| `POST` | `/admin/cartridges/<id>/<version>` | Edit title, summary, and tags |
+| `DELETE/POST` | `/admin/cartridges/<id>/<version>/delete` | Delete a variant or version |
+| `GET` | `/admin/backup` | Backup/restore page |
+| `GET` | `/admin/backup/download` | Download a full backup ZIP |
+| `POST` | `/admin/backup/restore` | Restore a full backup ZIP |
 
 ## Cartridge Catalog
 

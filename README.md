@@ -62,6 +62,11 @@ Authenticated users can upload cartridge packages. Users in the `editors` group
 verify pending packages before they appear in the public catalog. Legacy
 `PRG32_USERS` tokens are still accepted for API and multiplayer clients.
 
+Administrators use `/setup` for store, publish, mDNS, SMTP, OpenID Connect,
+and SAML2 settings. `/admin/users`, `/admin/groups`, `/admin/roles`,
+`/admin/cartridges`, and `/admin/backup` cover user/group/role assignment,
+cartridge administration, and full backup/restore.
+
 ## Versioning and Architectures
 
 A `.prg32` file contains one linked executable image. The store groups uploads

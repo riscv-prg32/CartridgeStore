@@ -31,26 +31,32 @@ storage mounted outside the container or process directory.
 | `PRG32_LDAP_BIND_PW` | unset | LDAP service account password |
 | `PRG32_LDAP_USER_ATTR` | `uid` | LDAP username attribute |
 | `PRG32_LDAP_ADMIN_GROUP` | unset | LDAP admin group DN |
-| `PRG32_SAML_IDP_METADATA_URL` | unset | SAML activation metadata URL/path |
-| `PRG32_SAML_SP_ENTITY_ID` | `prg32-cartrige-store` | SAML SP entity id |
-| `PRG32_SAML_SP_ACS_URL` | unset | SAML ACS URL |
-| `PRG32_SAML_ADMIN_ENTITLEMENT` | unset | Entitlement value mapped to admin |
+| `PRG32_OIDC_ENABLED` | unset | Set to `true` to enable OIDC |
 | `PRG32_OIDC_ISSUER` | unset | OIDC issuer discovery URL |
 | `PRG32_OIDC_CLIENT_ID` | unset | OIDC client id |
 | `PRG32_OIDC_CLIENT_SECRET` | unset | OIDC client secret |
-| `PRG32_OIDC_SCOPES` | `openid email profile` | OIDC scopes |
-| `PRG32_OIDC_ADMIN_CLAIM` | unset | ID-token JSON path mapped to admin |
+| `PRG32_OIDC_SCOPE` | `openid email profile` | OIDC scopes |
+| `PRG32_SAML_ENABLED` | unset | Set to `true` to enable SAML2 |
+| `PRG32_SAML_ENTITY_ID` | unset | SAML service-provider entity id |
+| `PRG32_SAML_ACS_URL` | unset | SAML assertion consumer URL |
+| `PRG32_SAML_SLS_URL` | unset | SAML single logout URL |
+| `PRG32_SAML_IDP_ENTITY_ID` | unset | SAML identity-provider entity id |
+| `PRG32_SAML_IDP_SSO_URL` | unset | SAML identity-provider SSO URL |
+| `PRG32_SAML_IDP_SLO_URL` | unset | SAML identity-provider logout URL |
+| `PRG32_SAML_IDP_X509CERT` | unset | SAML identity-provider signing certificate |
 
 ## Production Checklist
 
 - Set a high-entropy `SECRET_KEY`.
 - Change the seeded `admin` / `password` administrator credentials.
 - Configure SMTP so user registration links are delivered by email.
+- Configure mDNS, SMTP, OIDC, and SAML2 from `/setup` or environment variables.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
 - Put the service behind HTTPS termination.
 - Preserve `PRG32_STORE_DATA` on durable storage.
-- Back up `cartrige_store.sqlite`, `index.json`, `cartridges/`, and pending
-  submissions under `pending/`.
+- Use `/admin/backup` for full backups, or back up `cartrige_store.sqlite`,
+  `index.json`, `cartridges/`, custom static assets, and pending submissions
+  under `pending/`.
 - Configure reverse-proxy request size limits above `PRG32_BUNDLE_MAX_MB`.
 - Proxy WebSocket upgrades for `/api/multiplayer`.
 - Keep `zeroconf` installed if you want mDNS advertisement in production.

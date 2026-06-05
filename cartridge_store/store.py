@@ -171,6 +171,79 @@ class GameStore:
             raise StoreError("game not found")
         return self._public_game_record(game, version)
 
+    def update_metadata(
+        self,
+        game_id: str,
+        version: str,
+        *,
+        title: str,
+        summary: str,
+        tags: list[str],
+    ) -> dict[str, Any]:
+        game_id = safe_game_id(game_id)
+        version = safe_version(version)
+        index = self.load_index()
+        game = index.get("games", {}).get(game_id)
+        if not isinstance(game, dict):
+            raise StoreError("game not found")
+        version_rec = game.get("versions", {}).get(version)
+        if not isinstance(version_rec, dict):
+            raise StoreError("version not found")
+        metadata = dict(version_rec.get("metadata") or {})
+        metadata["id"] = game_id
+        metadata["version"] = version
+        metadata["title"] = title.strip() or metadata.get("title") or game_id
+        metadata["summary"] = summary.strip()
+        metadata["tags"] = tags
+        version_rec["metadata"] = metadata
+        version_rec["updated_at"] = utc_now()
+        game["title"] = metadata["title"]
+        game["summary"] = metadata["summary"]
+        game["tags"] = tags
+        game["updated_at"] = utc_now()
+        self.save_index(index)
+        return self.public_game(game_id, version=version)
+
+    def delete_variant(self, game_id: str, version: str, architecture: str | None = None) -> None:
+        game_id = safe_game_id(game_id)
+        version = safe_version(version)
+        index = self.load_index()
+        games = index.get("games", {})
+        game = games.get(game_id)
+        if not isinstance(game, dict):
+            raise StoreError("game not found")
+        versions = game.get("versions", {})
+        version_rec = versions.get(version)
+        if not isinstance(version_rec, dict):
+            raise StoreError("version not found")
+        architectures = version_rec.get("architectures", {})
+        if architecture:
+            architecture = fmt.normalize_architecture(architecture)
+            if architecture not in architectures:
+                raise StoreError("architecture not found")
+            self._remove_variant_file(architectures.pop(architecture))
+        else:
+            for variant in list(architectures.values()):
+                self._remove_variant_file(variant)
+            versions.pop(version, None)
+        if not architectures or not version_rec.get("architectures"):
+            versions.pop(version, None)
+        if not versions:
+            games.pop(game_id, None)
+        else:
+            if game.get("latest_version") == version:
+                game["latest_version"] = sorted(versions)[-1]
+            game["updated_at"] = utc_now()
+        self.save_index(index)
+
+    def _remove_variant_file(self, variant: dict[str, Any]) -> None:
+        filename = str(variant.get("filename", ""))
+        if not filename:
+            return
+        path = (self.data_dir / filename).resolve()
+        if self.data_dir.resolve() in path.parents and path.is_file():
+            path.unlink()
+
     def _public_game_record(self, game: dict[str, Any], version: str | None = None) -> dict[str, Any]:
         versions = game.get("versions", {})
         selected_version = version or game.get("latest_version")

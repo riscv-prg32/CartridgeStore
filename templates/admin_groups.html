@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Groups - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Groups</h1>
+  <form method="post" action="/admin/groups" class="inline-admin-form">
+    <input name="name" placeholder="group name" required>
+    <button type="submit">Create Group</button>
+  </form>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Users</th><th>Created</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for group in groups %}
+      <tr>
+        <td>
+          <form method="post" action="/admin/groups/{{ group.id }}" class="inline-admin-form">
+            <input name="name" value="{{ group.name }}" required>
+            <button type="submit">Save</button>
+          </form>
+        </td>
+        <td>{{ group.user_count }}</td>
+        <td>{{ group.created_at }}</td>
+        <td>
+          <form method="post" action="/admin/groups/{{ group.id }}/delete">
+            <button type="submit" {% if group.name == "editors" %}disabled{% endif %}>Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

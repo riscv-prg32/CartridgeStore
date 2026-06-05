@@ -63,7 +63,8 @@ password: password
 Log in at `http://127.0.0.1:5080/auth/login` and change the password before
 using the service beyond a disposable local demo. The default admin is also in
 the `editors` group. Visit `/setup` as that user to change the store name,
-theme, auth defaults, logo, and publish settings.
+theme, auth defaults, logo, publish settings, mDNS advertisement, SMTP mail,
+OpenID Connect, and SAML2.
 
 New users register from `/auth/register` by entering only an email address. The
 server sends a verification link; following it lets the user set a password.
@@ -138,17 +139,20 @@ export PRG32_MDNS_DISABLED=1
 
 Use `PRG32_MDNS_NAME` to override the advertised instance name.
 
+Administrators can also edit mDNS enabled/name/type/port values from `/setup`.
+Environment variables still take precedence after restart.
+
 ## External Auth
 
 Local username/password login always works. External adapters activate only
-when their environment variables are set and their optional libraries are
-installed:
+when enabled from `/setup` or environment variables and their optional
+libraries are installed:
 
 - LDAP / Active Directory: set `PRG32_LDAP_URL` and related LDAP variables;
   install `ldap3`.
-- SAML 2.0: set `PRG32_SAML_IDP_METADATA_URL`, SP entity/ACS values, and
-  install `python3-saml`.
-- OpenID Connect: set `PRG32_OIDC_ISSUER`, client id/secret, and install
+- SAML 2.0: enable SAML2, set SP entity/ACS values plus IdP entity, SSO URL,
+  and X.509 certificate; install `python3-saml`.
+- OpenID Connect: enable OIDC, set issuer plus client id/secret; install
   `authlib`.
 
 If an adapter is configured but its library is absent, startup logs a warning
@@ -168,6 +172,22 @@ export PRG32_SMTP_PASSWORD=secret
 
 `PRG32_SMTP_TLS` defaults to `true`; set it to `false` only for trusted local
 SMTP relays.
+
+The same values can be edited at `/setup`. Environment variables override
+database setup values when both are present.
+
+## Administration
+
+Admin-only pages:
+
+- `/admin/users` creates, edits, deletes, and assigns roles/groups to users.
+- `/admin/groups` creates, renames, and deletes groups. A user can belong to
+  many groups.
+- `/admin/roles` lists the fixed service roles and current user counts.
+- `/admin/backup` downloads and restores full service backups.
+
+Administrators and users in the `editors` group can use `/admin/cartridges` to
+edit cartridge title, summary, and tags, or delete variants/versions.
 
 ## Theme Customisation
 

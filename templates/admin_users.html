@@ -5,6 +5,17 @@
 {% block content %}
 <section class="table-panel">
   <h1>Users</h1>
+  <form method="post" action="/admin/users" class="inline-admin-form">
+    <input name="username" placeholder="username" required>
+    <input name="email" type="email" placeholder="email" required>
+    <input name="password" type="password" placeholder="password">
+    <select name="role">
+      {% for role in roles %}
+      <option value="{{ role }}">{{ role }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Create User</button>
+  </form>
   <table>
     <thead>
       <tr><th>Username</th><th>Email</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
@@ -12,29 +23,32 @@
     <tbody>
       {% for user in users %}
       <tr>
-        <td><a href="/users/{{ user.username }}">{{ user.username }}</a></td>
-        <td>{{ user.email }}</td>
-        <td>{{ user.role }}</td>
-        <td>{{ user.groups | join(", ") }}</td>
-        <td>{{ user.external_provider or "local" }}</td>
-        <td>{{ user.created_at }}</td>
-        <td class="action-cell">
-          <form method="post" action="/admin/users/{{ user.id }}/role">
+        <form method="post" action="/admin/users/{{ user.id }}">
+          <td><input name="username" value="{{ user.username }}" required></td>
+          <td><input name="email" type="email" value="{{ user.email }}" required></td>
+          <td>
             <select name="role">
-              <option value="user" {% if user.role == "user" %}selected{% endif %}>user</option>
-              <option value="admin" {% if user.role == "admin" %}selected{% endif %}>admin</option>
+              {% for role in roles %}
+              <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role }}</option>
+              {% endfor %}
             </select>
-            <button type="submit">Set</button>
-          </form>
-          <form method="post" action="/admin/users/{{ user.id }}/groups">
-            <label class="inline-check"><input type="checkbox" name="editors" value="1" {% if "editors" in user.groups %}checked{% endif %}> editors</label>
+          </td>
+          <td>
+            {% for group in groups %}
+            <label class="inline-check"><input type="checkbox" name="groups" value="{{ group.name }}" {% if group.name in user.groups %}checked{% endif %}> {{ group.name }}</label>
+            {% endfor %}
+            <input name="extra_groups" placeholder="extra groups">
+          </td>
+          <td>{{ user.external_provider or "local" }}</td>
+          <td>{{ user.created_at }}</td>
+          <td class="action-cell">
+            <input name="password" type="password" placeholder="new password">
             <button type="submit">Save</button>
-          </form>
-          <form method="post" action="/admin/users/{{ user.id }}">
-            <input type="hidden" name="_method" value="delete">
-            <button type="submit">Delete</button>
-          </form>
-        </td>
+        </form>
+            <form method="post" action="/admin/users/{{ user.id }}/delete">
+              <button type="submit">Delete</button>
+            </form>
+          </td>
       </tr>
       {% endfor %}
     </tbody>
