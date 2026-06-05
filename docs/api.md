@@ -11,7 +11,8 @@ GET /.well-known/prg32-store.json
 
 The `services` object includes `cartridges`, `bundle_publish`, `submissions`,
 `scores`, `metrics`, `multiplayer`, and `multiplayer_status` URLs. When mDNS
-advertisement is enabled, the service is announced as `_http._tcp.local.`.
+advertisement is enabled, the service is announced as `_prg32store._tcp.local.`
+with TXT record `abi=prg32-store-discovery-1.0`.
 
 ## Authentication
 

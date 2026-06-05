@@ -93,6 +93,50 @@ instead of replacing existing ones.
 - Keep the WebSocket relay on the same HTTP port as the web/API service.
 - The Docker image should run without requiring host-specific paths.
 
+## PRG32 Firmware Consistency
+
+This server is paired with the PRG32 firmware and tool repository.
+Keep both repositories consistent.
+
+Companion repository: https://github.com/riscv-prg32/PRG32
+
+### Canonical constants -- must match in both repos
+
+| Constant | Value |
+|---|---|
+| mDNS service type | `_prg32store._tcp` |
+| mDNS default port | `5080` |
+| Discovery ABI | `prg32-store-discovery-1.0` |
+| Metadata ABI | `prg32-metadata-1.0` |
+| Colophon ABI | `prg32-colophon-1.0` |
+| Architecture -- physical | `esp32c6` |
+| Architecture -- QEMU | `qemu` |
+
+### mDNS service registration
+
+CartridgeStore must register an mDNS service on startup using the
+already-installed `zeroconf` library:
+
+- Service type: `_prg32store._tcp`
+- Port: 5080, or `PRG32_STORE_PORT` if overridden
+- Instance name: configured `store_name` setting, default `PRG32 Cartrige Store`
+- TXT record: `abi=prg32-store-discovery-1.0`
+
+Deregister cleanly on shutdown. Guard registration and deregistration so mDNS
+failures degrade to logged warnings rather than startup crashes.
+
+If `PRG32_STORE_PORT` is set to a non-default value, update the port in the
+`/.well-known/prg32-store.json` response too.
+
+### Rules
+
+- Before changing any constant above in CartridgeStore, verify it matches in
+  the PRG32 firmware repo. Resolve discrepancies before merging.
+- Do not remove or rename fields from `/.well-known/prg32-store.json`; firmware
+  clients parse this response and will break silently on missing keys.
+- Architecture strings (`esp32c6`, `qemu`) are stored in SQLite; renaming them
+  requires a coordinated migration across both repos.
+
 ## Validation
 
 Before reporting completion, run the relevant subset:

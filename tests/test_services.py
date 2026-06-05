@@ -3,6 +3,8 @@ from __future__ import annotations
 import io
 import json
 import sqlite3
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +34,58 @@ def register(client, email: str, password: str = "longpassword") -> None:
         data={"token": token, "password": password, "password_confirm": password},
     )
     assert complete.status_code in (200, 302)
+
+
+def test_mdns_registers_prg32_service(tmp_path, monkeypatch) -> None:
+    registered = {}
+
+    class FakeInfo:
+        def __init__(self, service_type, name, addresses, port, properties, server):
+            registered["service_type"] = service_type
+            registered["name"] = name
+            registered["addresses"] = addresses
+            registered["port"] = port
+            registered["properties"] = properties
+            registered["server"] = server
+
+    class FakeZeroconf:
+        def register_service(self, info):
+            registered["info"] = info
+
+        def unregister_service(self, info):
+            registered["unregistered"] = info
+
+        def close(self):
+            registered["closed"] = True
+
+    fake_module = types.SimpleNamespace(ServiceInfo=FakeInfo, Zeroconf=FakeZeroconf)
+    monkeypatch.setitem(sys.modules, "zeroconf", fake_module)
+    monkeypatch.setattr("cartridge_store.mdns._local_addresses", lambda: [b"\x7f\x00\x00\x01"])
+    monkeypatch.setattr("cartridge_store.mdns._local_hostname", lambda: "host.local.")
+    app = create_app({"TESTING": False, "DATA_DIR": str(tmp_path / "data")})
+
+    assert registered["service_type"] == "_prg32store._tcp.local."
+    assert registered["name"] == "PRG32 Cartrige Store._prg32store._tcp.local."
+    assert registered["port"] == 5080
+    assert registered["properties"] == {"abi": "prg32-store-discovery-1.0"}
+    pair = app.extensions["prg32_mdns"]
+    pair["zeroconf"].unregister_service(pair["info"])
+    pair["zeroconf"].close()
+    assert registered["unregistered"] is pair["info"]
+    assert registered["closed"] is True
+
+
+def test_discovery_uses_store_port_env(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("PRG32_STORE_PORT", "5099")
+    app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
+    client = app.test_client()
+
+    response = client.get("/.well-known/prg32-store.json", headers={"Host": "store.local:5080"})
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["api"] == "http://store.local:5099/api"
+    assert body["services"]["multiplayer"] == "ws://store.local:5099/api/multiplayer"
 
 
 def publish_payload(architecture: str = "esp32c6") -> dict:

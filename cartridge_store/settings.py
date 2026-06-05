@@ -36,7 +36,7 @@ DEFAULT_SETTINGS = {
     "publish_allowed_architectures": "qemu,esp32c6",
     "mdns_enabled": "true",
     "mdns_name": "",
-    "mdns_type": "_http._tcp.local.",
+    "mdns_type": "_prg32store._tcp.local.",
     "mdns_port": "5080",
     "smtp_host": "",
     "smtp_port": "587",

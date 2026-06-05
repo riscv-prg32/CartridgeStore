@@ -435,9 +435,15 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     @app.get("/.well-known/prg32-store.json")
     def discovery():
-        base = request.host_url.rstrip("/")
+        port = os.environ.get("PRG32_STORE_PORT")
+        host = request.host
+        if port:
+            hostname = request.host.split(":", 1)[0]
+            host = f"{hostname}:{port}"
+        scheme = request.scheme
+        base = f"{scheme}://{host}"
         ws_scheme = "wss" if request.scheme == "https" else "ws"
-        ws_base = f"{ws_scheme}://{request.host}"
+        ws_base = f"{ws_scheme}://{host}"
         return jsonify(
             {
                 "abi": "prg32-store-discovery-1.0",
@@ -469,7 +475,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "auth_enabled": auth_is_configured(),
                 "roles": list(ROLE_LEVELS),
                 "mdns": {
-                    "service": "_http._tcp.local.",
+                    "service": "_prg32store._tcp.local.",
                     "name": os.environ.get("PRG32_MDNS_NAME", app.config["STORE_NAME"]),
                 },
                 "endpoints": [

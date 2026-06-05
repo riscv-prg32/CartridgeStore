@@ -129,9 +129,8 @@ are linked to the submitting user and appear under `/users/<username>/runs`.
 
 ## mDNS Discovery
 
-The server advertises itself on the local network as `_http._tcp.local.` with
-TXT records for `/`, `/api`, and `/.well-known/prg32-store.json`. Disable this
-with:
+The server advertises itself on the local network as `_prg32store._tcp.local.`
+with TXT record `abi=prg32-store-discovery-1.0`. Disable this with:
 
 ```bash
 export PRG32_MDNS_DISABLED=1

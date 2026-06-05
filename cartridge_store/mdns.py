@@ -28,12 +28,14 @@ def register_mdns(app: Flask) -> None:
         return
 
     service_type = os.environ.get("PRG32_MDNS_TYPE", values["type"])
+    if not service_type.endswith(".local."):
+        service_type = service_type.rstrip(".") + ".local."
     instance = os.environ.get("PRG32_MDNS_NAME", values["name"]) or app.config["STORE_NAME"]
     if not instance.endswith("." + service_type):
         service_name = f"{instance}.{service_type}"
     else:
         service_name = instance
-    port = int(os.environ.get("PRG32_MDNS_PORT", values["port"]))
+    port = int(os.environ.get("PRG32_STORE_PORT", os.environ.get("PRG32_MDNS_PORT", values["port"])))
     addresses = _local_addresses()
     if not addresses:
         log.warning("mDNS advertisement disabled because no IPv4 address was found")
@@ -44,9 +46,7 @@ def register_mdns(app: Flask) -> None:
         addresses=addresses,
         port=port,
         properties={
-            "path": "/",
-            "api": "/api",
-            "discovery": "/.well-known/prg32-store.json",
+            "abi": "prg32-store-discovery-1.0",
         },
         server=_local_hostname(),
     )
@@ -66,7 +66,7 @@ def _mdns_settings(app: Flask) -> dict[str, str]:
     values = {
         "enabled": "true",
         "name": app.config["STORE_NAME"],
-        "type": "_http._tcp.local.",
+        "type": "_prg32store._tcp.local.",
         "port": "5080",
     }
     try:
