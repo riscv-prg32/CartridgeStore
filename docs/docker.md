@@ -6,6 +6,7 @@ multiplayer WebSocket relay as one service.
 ## Quick Start
 
 ```bash
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose up --build
 ```
 
@@ -46,6 +47,7 @@ Run the image manually:
 docker run --rm \
   -p 5080:5080 \
   -v "$PWD/data:/data" \
+  -e SECRET_KEY="$SECRET_KEY" \
   -e PRG32_STORE_DATA=/data \
   -e PRG32_STORE_DB=/data/cartrige_store.sqlite \
   prg32-cartrige-store:local

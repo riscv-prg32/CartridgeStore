@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ run.run_id }} - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>{{ run.run_id }}</h1>
+  <dl class="metric-list">
+    <dt>Board</dt><dd>{{ run.board_id }}</dd>
+    <dt>Target</dt><dd>{{ run.target }}</dd>
+    <dt>Game</dt><dd>{{ run.game_name }}</dd>
+    <dt>Samples</dt><dd>{{ summary.sample_count }}</dd>
+    <dt>Mean frame_us</dt><dd>{{ "%.1f"|format(summary.frame_us_avg) }}</dd>
+    <dt>p95 frame_us</dt><dd>{{ "%.1f"|format(summary.frame_us_p95) }}</dd>
+  </dl>
+  <div class="download-list">
+    <a class="button" href="/api/runs/{{ run.run_id }}?format=json">Download JSON</a>
+    <a class="button" href="/api/runs/{{ run.run_id }}/samples.csv">Download CSV</a>
+  </div>
+</section>
+
+<section class="chart-panel">
+  <h2>Frame Time</h2>
+  {{ frame_chart | safe }}
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Users - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>Users</h1>
+  <table>
+    <thead>
+      <tr><th>Username</th><th>Email</th><th>Role</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td><a href="/users/{{ user.username }}">{{ user.username }}</a></td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.role }}</td>
+        <td>{{ user.external_provider or "local" }}</td>
+        <td>{{ user.created_at }}</td>
+        <td class="action-cell">
+          <form method="post" action="/admin/users/{{ user.id }}/role">
+            <select name="role">
+              <option value="user" {% if user.role == "user" %}selected{% endif %}>user</option>
+              <option value="admin" {% if user.role == "admin" %}selected{% endif %}>admin</option>
+            </select>
+            <button type="submit">Set</button>
+          </form>
+          <form method="post" action="/admin/users/{{ user.id }}">
+            <input type="hidden" name="_method" value="delete">
+            <button type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

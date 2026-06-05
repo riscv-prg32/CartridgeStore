@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Setup - {{ store_name }}{% endblock %}
+
+{% block content %}
+<form method="post" action="/setup" class="setup-form">
+  <section>
+    <h1>Setup</h1>
+    <h2>Identity</h2>
+    <div class="field-grid">
+      <label>Store Name<input name="store_name" value="{{ settings.store_name }}"></label>
+      <label>Tagline<input name="store_tagline" value="{{ settings.store_tagline }}"></label>
+      <label>Contact Email<input name="store_contact_email" type="email" value="{{ settings.store_contact_email }}"></label>
+      <label>Institution<input name="store_institution" value="{{ settings.store_institution }}"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Theme</h2>
+    <div class="field-grid">
+      <label>Primary Color<input name="theme_primary_color" type="color" value="{{ settings.theme_primary_color }}"></label>
+      <label>Secondary Color<input name="theme_secondary_color" type="color" value="{{ settings.theme_secondary_color }}"></label>
+      <label>Font Family<input name="theme_font_family" value="{{ settings.theme_font_family }}"></label>
+      <label>Logo URL<input name="theme_logo_url" value="{{ settings.theme_logo_url }}"></label>
+      <label>Favicon URL<input name="theme_favicon_url" value="{{ settings.theme_favicon_url }}"></label>
+    </div>
+    <label>Custom CSS<textarea name="theme_custom_css">{{ settings.theme_custom_css }}</textarea></label>
+    <div class="theme-preview">
+      {% if settings.theme_logo_url %}
+      <img src="{{ settings.theme_logo_url }}" alt="{{ settings.store_name }}" class="site-logo">
+      {% else %}
+      <img src="{{ url_for('static', filename='img/default_logo.svg') }}" alt="{{ settings.store_name }}" class="site-logo">
+      {% endif %}
+      <strong>{{ settings.store_name }}</strong>
+      <span>{{ settings.store_tagline }}</span>
+      <button type="button">Sample</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Authentication</h2>
+    <label class="check-row"><input name="auth_allow_registration" type="checkbox" value="true" {% if settings.auth_allow_registration == "true" %}checked{% endif %}> Allow registration</label>
+    <div class="field-grid">
+      <label>Required Email Domain<input name="auth_require_email_domain" value="{{ settings.auth_require_email_domain }}"></label>
+      <label>Default Role
+        <select name="auth_default_role">
+          <option value="user" {% if settings.auth_default_role == "user" %}selected{% endif %}>user</option>
+          <option value="admin" {% if settings.auth_default_role == "admin" %}selected{% endif %}>admin</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Publish</h2>
+    <label class="check-row"><input name="publish_require_auth" type="checkbox" value="true" {% if settings.publish_require_auth == "true" %}checked{% endif %}> Require auth to publish</label>
+    <div class="field-grid">
+      <label>Max Bundle MB<input name="publish_max_bundle_mb" type="number" min="1" value="{{ settings.publish_max_bundle_mb }}"></label>
+      <label>Allowed Architectures<input name="publish_allowed_architectures" value="{{ settings.publish_allowed_architectures }}"></label>
+    </div>
+  </section>
+
+  <button class="primary" type="submit">Save Settings</button>
+</form>
+
+<section class="split">
+  <form method="post" action="/setup/logo" enctype="multipart/form-data">
+    <h2>Logo</h2>
+    <label>Logo File<input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml" required></label>
+    <button type="submit">Upload Logo</button>
+  </form>
+  <form method="post" action="/setup/favicon" enctype="multipart/form-data">
+    <h2>Favicon</h2>
+    <label>Favicon File<input type="file" name="favicon" accept="image/png,image/jpeg,image/svg+xml" required></label>
+    <button type="submit">Upload Favicon</button>
+  </form>
+</section>
+{% endblock %}

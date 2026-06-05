@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="{{ theme_primary_color }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  {% if theme_favicon_url %}<link rel="icon" href="{{ theme_favicon_url }}">{% endif %}
+  <link rel="stylesheet" href="/static/style.css">
+  <title>{% block title %}{{ store_name }}{% endblock %}</title>
+  <style>
+    :root {
+      --color-primary: {{ theme_primary_color }};
+      --color-secondary: {{ theme_secondary_color }};
+      --font-family: {{ theme_font_family }};
+    }
+    {{ theme_custom_css | safe }}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      {% if theme_logo_url %}
+      <img src="{{ theme_logo_url }}" alt="{{ store_name }}" class="site-logo">
+      {% else %}
+      <img src="{{ url_for('static', filename='img/default_logo.svg') }}" alt="{{ store_name }}" class="site-logo">
+      {% endif %}
+      <span class="site-copy">
+        <span class="site-title">{{ store_name }}</span>
+        {% if store_tagline %}<span class="site-tagline">{{ store_tagline }}</span>{% endif %}
+      </span>
+    </a>
+    <nav>
+      <a href="/">Store</a>
+      <a href="/stats">Stats</a>
+      <a href="/publish">Publish</a>
+      <a href="/api/games">API</a>
+      {% if current_user.authenticated and current_user.role == "admin" %}
+      <a href="/setup">Setup</a>
+      {% endif %}
+      {% if current_user.authenticated %}
+      <form method="post" action="/auth/logout" class="nav-form"><button type="submit">Logout</button></form>
+      {% else %}
+      <a href="/auth/login">Login</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flash" role="status">
+      {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="{% block main_class %}shell{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/app.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

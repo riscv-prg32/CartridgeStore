@@ -9,9 +9,10 @@ from typing import Any
 
 from flask import Flask, Response, current_app, jsonify, request
 
-from .auth import current_principal, require_role
+from .auth import current_principal
 from .database import add_column_if_missing, get_db
 from .metrics_report import generate_markdown_report, list_runs, summarize_samples
+from .users import can_view_run, run_json_response
 
 
 METRICS_SCHEMA = """
@@ -59,6 +60,7 @@ def init_metrics_db() -> None:
     db = get_db()
     db.executescript(METRICS_SCHEMA)
     add_column_if_missing(db, "runs", "submitted_by", "TEXT NOT NULL DEFAULT ''")
+    add_column_if_missing(db, "runs", "user_id", "INTEGER REFERENCES users(id)")
     db.commit()
 
 
@@ -120,7 +122,6 @@ def register_metrics_routes(app: Flask) -> None:
         )
 
     @app.post("/api/runs")
-    @require_role("player")
     def create_run():
         data = request.get_json(silent=True) or {}
         run_id = _clean_text(data, "run_id", 96)
@@ -140,6 +141,7 @@ def register_metrics_routes(app: Flask) -> None:
             "sample_period_frames": _int_value(data, "sample_period_frames", 1, 1),
             "started_at": _int_value(data, "started_ms", int(time.time() * 1000), 0),
             "submitted_by": current_principal().name,
+            "user_id": current_principal().id,
         }
 
         get_db().execute(
@@ -147,12 +149,12 @@ def register_metrics_routes(app: Flask) -> None:
             INSERT INTO runs(
                 run_id, board_id, target, display_backend, firmware_version,
                 firmware_git_sha, game_name, sample_period_frames, started_at,
-                submitted_by
+                submitted_by, user_id
             )
             VALUES (
                 :run_id, :board_id, :target, :display_backend, :firmware_version,
                 :firmware_git_sha, :game_name, :sample_period_frames, :started_at,
-                :submitted_by
+                :submitted_by, :user_id
             )
             ON CONFLICT(run_id) DO UPDATE SET
                 board_id = excluded.board_id,
@@ -163,7 +165,8 @@ def register_metrics_routes(app: Flask) -> None:
                 game_name = excluded.game_name,
                 sample_period_frames = excluded.sample_period_frames,
                 started_at = excluded.started_at,
-                submitted_by = excluded.submitted_by
+                submitted_by = excluded.submitted_by,
+                user_id = excluded.user_id
             """,
             record,
         )
@@ -171,7 +174,6 @@ def register_metrics_routes(app: Flask) -> None:
         return jsonify({"ok": True, "run_id": run_id})
 
     @app.post("/api/metrics/batch")
-    @require_role("player")
     def create_batch():
         data = request.get_json(silent=True) or {}
         run_id = _clean_text(data, "run_id", 96)
@@ -231,7 +233,6 @@ def register_metrics_routes(app: Flask) -> None:
         return jsonify({"ok": True, "inserted": inserted, "received": len(samples)})
 
     @app.post("/api/runs/<run_id>/finish")
-    @require_role("player")
     def finish_run(run_id: str):
         data = request.get_json(silent=True) or {}
         finished_at = _int_value(data, "finished_ms", int(time.time() * 1000), 0)
@@ -256,11 +257,15 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs/<run_id>")
     def run_detail(run_id: str):
+        if request.args.get("format") == "json":
+            return run_json_response(run_id)
         run = _row_dict(
             get_db().execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         )
         if not run:
             return jsonify({"ok": False, "error": "run_id not found"}), 404
+        if not can_view_run(run):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
         samples = _samples_for_run(run_id)
         return jsonify({"ok": True, "run": run, "summary": summarize_samples(samples)})
 

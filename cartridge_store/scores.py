@@ -6,7 +6,7 @@ import time
 
 from flask import Flask, jsonify, request
 
-from .auth import current_principal, require_role
+from .auth import current_principal, login_required
 from .database import add_column_if_missing, get_db
 
 
@@ -66,7 +66,7 @@ def register_score_routes(app: Flask) -> None:
         return jsonify([dict(row) for row in rows])
 
     @app.post("/api/scores")
-    @require_role("player")
+    @login_required
     def submit_score():
         data = request.get_json(silent=True) or {}
         game = str(data.get("game", "")).strip()[:24]

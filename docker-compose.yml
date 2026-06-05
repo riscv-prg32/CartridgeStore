@@ -6,6 +6,7 @@ services:
     ports:
       - "5080:5080"
     environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
       PRG32_STORE_DATA: /data
       PRG32_STORE_DB: /data/cartrige_store.sqlite
       PRG32_MP_MAX_PEERS: "8"

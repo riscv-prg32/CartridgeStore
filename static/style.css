@@ -5,9 +5,12 @@
   --paper: #f7f8f5;
   --panel: #ffffff;
   --line: #d7ddd4;
-  --accent: #1f7a5a;
-  --accent-2: #b85d21;
-  --dark: #18242f;
+  --color-primary: #1a73e8;
+  --color-secondary: #174ea6;
+  --accent: var(--color-primary);
+  --accent-2: var(--color-secondary);
+  --dark: var(--color-secondary);
+  --font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * {
@@ -18,7 +21,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-family);
   line-height: 1.5;
 }
 
@@ -38,11 +41,36 @@ a {
 }
 
 .brand {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
   font-weight: 800;
   text-decoration: none;
 }
 
+.site-logo {
+  height: 38px;
+  object-fit: contain;
+  width: 38px;
+}
+
+.site-copy {
+  display: grid;
+  line-height: 1.1;
+}
+
+.site-title {
+  font-weight: 800;
+}
+
+.site-tagline {
+  color: #dfe8e3;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .topbar nav {
+  align-items: center;
   display: flex;
   gap: 16px;
 }
@@ -51,6 +79,28 @@ a {
   color: #dfe8e3;
   font-size: 0.95rem;
   text-decoration: none;
+}
+
+.nav-form {
+  margin: 0;
+}
+
+.nav-form button {
+  background: transparent;
+  color: #dfe8e3;
+  min-height: 0;
+  padding: 0;
+}
+
+.flash {
+  background: #eef7ff;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  padding: 8px 24px;
+}
+
+.flash p {
+  margin: 0;
 }
 
 .shell,
@@ -111,7 +161,7 @@ button,
 
 button:hover,
 .button:hover {
-  background: #176a4d;
+  background: var(--color-secondary);
 }
 
 .primary {
@@ -238,6 +288,11 @@ h2 {
 .download-panel,
 .split,
 .colophon,
+.auth-panel,
+.bundle-panel,
+.chart-panel,
+.table-panel,
+.setup-form section,
 .publish form section,
 .error {
   background: var(--panel);
@@ -245,6 +300,10 @@ h2 {
   border-radius: 8px;
   margin-bottom: 16px;
   padding: 18px;
+}
+
+.bundle-panel {
+  margin-top: 18px;
 }
 
 .split {
@@ -293,6 +352,99 @@ label {
   margin-bottom: 12px;
 }
 
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.check-row input {
+  min-height: auto;
+  width: auto;
+}
+
+.result-area {
+  margin-top: 12px;
+}
+
+.success-text {
+  color: #166534;
+}
+
+.error-text {
+  color: #b42318;
+}
+
+.theme-preview {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 8%, white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+}
+
+table {
+  border-collapse: collapse;
+  margin-top: 12px;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.action-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-cell form {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.action-cell select,
+.action-cell button {
+  min-height: 34px;
+}
+
+.stat-number {
+  color: var(--accent);
+  font-size: 2.4rem;
+  font-weight: 800;
+}
+
+.metric-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+}
+
+.metric-list dd {
+  margin: 0;
+}
+
+svg {
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
 .empty {
   color: var(--muted);
 }
@@ -320,5 +472,12 @@ label {
   .detail,
   .publish {
     padding: 16px;
+  }
+
+  .topbar nav,
+  .action-cell,
+  .action-cell form {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

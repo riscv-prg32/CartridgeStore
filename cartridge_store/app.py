@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
+import zipfile
+from copy import deepcopy
+from io import BytesIO
 
 from flask import (
     Flask,
+    Request as FlaskRequest,
     Response,
+    abort,
+    current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -18,16 +26,34 @@ from flask import (
     url_for,
 )
 
-from . import prg32_format as fmt
-from .auth import ROLE_LEVELS, auth_is_configured, current_principal, require_role
-from .database import close_db
+from . import charts, prg32_format as fmt
+from .auth import (
+    ROLE_LEVELS,
+    admin_required,
+    auth_is_configured,
+    current_principal,
+    login_required,
+    register_auth_routes,
+)
+from .database import close_db, get_db
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
 from .scores import register_score_routes
-from .store import GameStore, StoreError
+from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
+from .stats import game_download_breakdown, record_download, register_stats_routes
+from .store import GameStore, StoreError, safe_game_id, safe_version
+from .users import register_user_routes
 
 
 DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
+
+
+class CartridgeRequest(FlaskRequest):
+    @property
+    def max_content_length(self) -> int | None:
+        if self.path == "/api/publish/bundle":
+            return int(current_app.config["BUNDLE_MAX_CONTENT_LENGTH"])
+        return super().max_content_length
 
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
@@ -48,15 +74,27 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         template_folder=str(root / "templates"),
         static_folder=str(root / "static"),
     )
+    app.request_class = CartridgeRequest
+    secret_key = os.environ.get("SECRET_KEY", "")
+    if test_config and test_config.get("SECRET_KEY"):
+        secret_key = str(test_config["SECRET_KEY"])
+    if not secret_key and not (test_config and test_config.get("TESTING")):
+        message = "SECRET_KEY must be set before starting PRG32 Cartrige Store"
+        print(message, file=sys.stderr)
+        raise RuntimeError(message)
+    if not secret_key:
+        secret_key = "test-secret-key"
     app.config.update(
         DATA_DIR=data_dir,
         DATABASE=database_path,
         SERVICES_DB=None,
         MAX_CONTENT_LENGTH=DEFAULT_MAX_UPLOAD,
+        BUNDLE_MAX_CONTENT_LENGTH=int(os.environ.get("PRG32_BUNDLE_MAX_MB", "64")) * 1024 * 1024,
         MULTIPLAYER_MAX_PEERS=int(os.environ.get("PRG32_MP_MAX_PEERS", "8")),
         STORE_NAME="PRG32 Cartrige Store",
         STORE_VERSION="1.0.0",
         USERS=None,
+        SECRET_KEY=secret_key,
     )
     if test_config:
         app.config.update(test_config)
@@ -69,9 +107,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
 
     store = GameStore(app.config["DATA_DIR"])
     app.teardown_appcontext(close_db)
+    register_auth_routes(app)
+    register_settings(app)
     register_score_routes(app)
     register_metrics_routes(app)
     register_multiplayer_routes(app)
+    register_stats_routes(app, store)
+    register_user_routes(app)
 
     @app.errorhandler(StoreError)
     @app.errorhandler(fmt.CartridgeFormatError)
@@ -82,6 +124,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return jsonify({"ok": False, "error": str(exc)}), 400
         return render_template("error.html", error=str(exc)), 400
 
+    @app.errorhandler(413)
+    def handle_too_large(exc: Exception):
+        if request.path.startswith("/api/") or request.path.startswith("/setup/"):
+            return jsonify({"ok": False, "error": "upload is too large"}), 413
+        return render_template("error.html", error="Upload is too large."), 413
+
     @app.get("/")
     def index():
         q = request.args.get("q", "")
@@ -89,28 +137,100 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "index.html",
             games=store.list_games(q),
             q=q,
-            store_name=app.config["STORE_NAME"],
         )
 
     @app.get("/games/<game_id>")
     def game_detail(game_id: str):
         game = store.public_game(game_id, version=request.args.get("version"))
-        return render_template("game.html", game=game, store_name=app.config["STORE_NAME"])
+        scores = _scores_for_game(game_id)
+        primary = get_setting("theme_primary_color", "#1a73e8")
+        score_chart = _score_chart(scores, primary)
+        download_stats = game_download_breakdown(game_id)
+        return render_template(
+            "game.html",
+            game=game,
+            scores=scores,
+            score_chart=score_chart,
+            download_count=download_stats["total"],
+        )
 
     @app.get("/publish")
     def publish_page():
         return render_template(
             "publish.html",
             architectures=fmt.ARCHITECTURE_PROFILES,
-            store_name=app.config["STORE_NAME"],
             token=request.args.get("token", ""),
         )
 
     @app.post("/publish")
-    @require_role("publisher")
+    @login_required
     def publish_page_post():
         result = publish_request(store)
         return redirect(url_for("game_detail", game_id=result["id"]))
+
+    @app.get("/setup")
+    @admin_required
+    def setup_page():
+        return render_template("setup.html", settings=_settings_form_values())
+
+    @app.post("/setup")
+    @admin_required
+    def setup_save():
+        for key in _settings_form_values():
+            if key in ("auth_allow_registration", "publish_require_auth"):
+                set_setting(key, "true" if request.form.get(key) else "false")
+            else:
+                set_setting(key, request.form.get(key, DEFAULT_SETTINGS.get(key, "")))
+        flash("Settings saved.")
+        return redirect(url_for("setup_page"))
+
+    @app.post("/setup/logo")
+    @admin_required
+    def setup_logo():
+        return _save_custom_asset("logo", "theme_logo_url")
+
+    @app.post("/setup/favicon")
+    @admin_required
+    def setup_favicon():
+        return _save_custom_asset("favicon", "theme_favicon_url")
+
+    @app.get("/static/custom/<filename>")
+    def custom_static(filename: str):
+        path = Path(app.config["DATA_DIR"]) / "static" / filename
+        if not path.is_file() or "/" in filename or "\\" in filename:
+            abort(404)
+        return send_file(path)
+
+    @app.get("/admin/users")
+    @admin_required
+    def admin_users():
+        page = max(request.args.get("page", default=1, type=int), 1)
+        per_page = 50
+        rows = _admin_user_rows(per_page, (page - 1) * per_page)
+        return render_template("admin_users.html", users=rows, page=page)
+
+    @app.post("/admin/users/<int:user_id>/role")
+    @admin_required
+    def admin_user_role(user_id: int):
+        principal = current_principal()
+        role = request.form.get("role", "user")
+        if user_id == principal.id:
+            return jsonify({"ok": False, "error": "admins cannot demote themselves"}), 400
+        if role not in ("user", "admin"):
+            return jsonify({"ok": False, "error": "role must be user or admin"}), 400
+        _set_user_role(user_id, role)
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/<int:user_id>", methods=["DELETE", "POST"])
+    @admin_required
+    def admin_user_delete(user_id: int):
+        principal = current_principal()
+        if user_id == principal.id:
+            return jsonify({"ok": False, "error": "admins cannot delete themselves"}), 400
+        deleted = _delete_user(user_id)
+        if request.method == "DELETE":
+            return jsonify({"ok": deleted})
+        return redirect(url_for("admin_users"))
 
     @app.get("/manifest.webmanifest")
     def manifest():
@@ -124,7 +244,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return jsonify(
             {
                 "abi": "prg32-store-discovery-1.0",
-                "name": app.config["STORE_NAME"],
+                "name": get_setting("store_name", app.config["STORE_NAME"]),
                 "api": base + "/api",
                 "web": base + "/",
                 "version": app.config["STORE_VERSION"],
@@ -132,6 +252,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "roles": list(ROLE_LEVELS),
                 "services": {
                     "cartridges": base + "/api/games",
+                    "bundle_publish": base + "/api/publish/bundle",
                     "scores": base + "/api/scores",
                     "metrics": base + "/api/runs",
                     "multiplayer": ws_base + "/api/multiplayer",
@@ -145,7 +266,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         return jsonify(
             {
                 "ok": True,
-                "service": app.config["STORE_NAME"],
+                "service": get_setting("store_name", app.config["STORE_NAME"]),
                 "version": app.config["STORE_VERSION"],
                 "auth_enabled": auth_is_configured(),
                 "roles": list(ROLE_LEVELS),
@@ -226,6 +347,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             version=request.args.get("version"),
             architecture=request.args.get("architecture"),
         )
+        record_download(game["id"], game["selected_version"], variant["architecture"])
         name = f"{game['id']}-{game['selected_version']}-{variant['architecture']}.prg32"
         return send_file(
             path,
@@ -235,9 +357,18 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         )
 
     @app.post("/api/publish")
-    @require_role("publisher")
+    @login_required
     def api_publish():
         return jsonify({"ok": True, "game": publish_request(store)})
+
+    @app.post("/api/publish/bundle")
+    @login_required
+    def api_publish_bundle():
+        limit = int(app.config["BUNDLE_MAX_CONTENT_LENGTH"])
+        if request.content_length is not None and request.content_length > limit:
+            return jsonify({"ok": False, "error": "bundle upload is too large"}), 413
+        result = publish_bundle_request(store)
+        return jsonify(result)
 
     return app
 
@@ -252,6 +383,88 @@ def read_upload(name: str, *, required: bool) -> bytes | None:
     if required and not data:
         raise StoreError(f"empty upload: {name}")
     return data or None
+
+
+def _settings_form_values() -> dict[str, str]:
+    return {key: get_setting(key, default) for key, default in DEFAULT_SETTINGS.items()}
+
+
+def _save_custom_asset(kind: str, setting_key: str):
+    upload = request.files.get(kind)
+    if upload is None or not upload.filename:
+        return jsonify({"ok": False, "error": f"missing upload: {kind}"}), 400
+    data = upload.read()
+    if len(data) > 2 * 1024 * 1024:
+        return jsonify({"ok": False, "error": f"{kind} is too large"}), 413
+    ext = _asset_extension(data)
+    if ext is None:
+        return jsonify({"ok": False, "error": f"{kind} must be PNG, JPEG, or SVG"}), 400
+    custom_dir = Path(current_app.config["DATA_DIR"]) / "static"
+    custom_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{kind}.{ext}"
+    (custom_dir / filename).write_bytes(data)
+    url = url_for("custom_static", filename=filename)
+    set_setting(setting_key, url)
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"ok": True, "url": url})
+    return redirect(url_for("setup_page"))
+
+
+def _asset_extension(data: bytes) -> str | None:
+    if fmt.detect_image_mime(data) == "image/png":
+        return "png"
+    if fmt.detect_image_mime(data) == "image/jpeg":
+        return "jpg"
+    stripped = data.lstrip()[:256].lower()
+    if stripped.startswith(b"<svg") or stripped.startswith(b"<?xml"):
+        return "svg"
+    return None
+
+
+def _admin_user_rows(limit: int, offset: int) -> list[dict[str, Any]]:
+    rows = get_db().execute(
+        """
+        SELECT id, username, email, role, external_provider, created_at, last_login
+        FROM users
+        ORDER BY created_at ASC, id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _set_user_role(user_id: int, role: str) -> None:
+    get_db().execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    get_db().commit()
+
+
+def _delete_user(user_id: int) -> bool:
+    cursor = get_db().execute("DELETE FROM users WHERE id = ?", (user_id,))
+    get_db().commit()
+    return cursor.rowcount > 0
+
+
+def _scores_for_game(game_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    rows = get_db().execute(
+        """
+        SELECT game, player, score, created_at, submitted_by
+        FROM scores
+        WHERE game = ?
+        ORDER BY score DESC, created_at ASC
+        LIMIT ?
+        """,
+        (game_id, limit),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _score_chart(scores: list[dict[str, Any]], color: str) -> str:
+    return charts.bar_chart(
+        [(score["player"], int(score["score"])) for score in scores],
+        color=color,
+        title="Leaderboard",
+    )
 
 
 def parse_json_field(name: str) -> dict[str, Any] | None:
@@ -354,6 +567,10 @@ def publish_request(store: GameStore) -> dict[str, Any]:
         colophon=colophon,
         architecture=architecture,
     )
+    return publish_cartridge_image(store, image, architecture)
+
+
+def publish_cartridge_image(store: GameStore, image: bytes, architecture: str) -> dict[str, Any]:
     parsed = fmt.parse_cartridge(image)
     return store.publish(
         image,
@@ -361,6 +578,183 @@ def publish_request(store: GameStore) -> dict[str, Any]:
         architecture=fmt.normalize_architecture(architecture) or "esp32c6",
         publisher=current_principal().name,
     )
+
+
+def publish_bundle_request(store: GameStore) -> dict[str, Any]:
+    upload = request.files.get("bundle")
+    if upload is None or not upload.filename:
+        raise StoreError("missing upload: bundle")
+    bundle = upload.read()
+    if not bundle:
+        raise StoreError("empty upload: bundle")
+    if not bundle.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
+        raise StoreError("bundle must be a zip file")
+    try:
+        with zipfile.ZipFile(BytesIO(bundle)) as zf:
+            prepared = _prepare_bundle(zf)
+    except zipfile.BadZipFile as exc:
+        raise StoreError("bundle must be a valid zip file") from exc
+
+    _publish_prepared_bundle(store, prepared)
+    manifest = prepared[0]["manifest"]
+    return {
+        "status": "ok",
+        "ok": True,
+        "id": manifest["id"],
+        "version": manifest["version"],
+        "published": [
+            {"architecture": item["architecture"], "file": item["file"]}
+            for item in prepared
+        ],
+    }
+
+
+def _prepare_bundle(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
+    names = {info.filename for info in zf.infolist() if not info.is_dir()}
+    if "manifest.json" not in names:
+        raise StoreError("bundle is missing manifest.json")
+    manifest = _read_manifest(zf)
+    if manifest.get("abi") != fmt.METADATA_ABI:
+        raise StoreError(f"manifest.abi must be {fmt.METADATA_ABI}")
+    fmt.validate_metadata(manifest)
+    assets = manifest.get("assets")
+    if not isinstance(assets, dict):
+        raise StoreError("manifest.assets must be an object")
+    icon_name = _manifest_filename(assets.get("icon"), "manifest.assets.icon")
+    if icon_name not in names:
+        raise StoreError("bundle icon file is missing")
+    icon = zf.read(icon_name)
+    if fmt.detect_image_mime(icon) is None:
+        raise StoreError("bundle icon must be PNG or JPEG")
+
+    splash = None
+    splash_name = assets.get("splash")
+    if splash_name:
+        splash_file = _manifest_filename(splash_name, "manifest.assets.splash")
+        if splash_file not in names:
+            raise StoreError("bundle splash file is missing")
+        splash = zf.read(splash_file)
+        if fmt.detect_image_mime(splash) is None:
+            raise StoreError("bundle splash must be PNG or JPEG")
+
+    architectures = manifest.get("architectures")
+    if not isinstance(architectures, list) or not architectures:
+        raise StoreError("manifest.architectures must be a non-empty array")
+
+    prepared: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in architectures:
+        if not isinstance(entry, dict):
+            raise StoreError("manifest.architectures entries must be objects")
+        architecture = fmt.normalize_architecture(str(entry.get("id", "")))
+        if not architecture:
+            raise StoreError("architecture id is required")
+        if architecture in seen:
+            raise StoreError(f"duplicate architecture: {architecture}")
+        seen.add(architecture)
+        file_name = _manifest_filename(entry.get("file"), "architecture.file")
+        if not file_name.endswith(".prg32"):
+            raise StoreError("architecture.file must point to a .prg32 file")
+        if file_name not in names:
+            raise StoreError(f"bundle cartridge file is missing: {file_name}")
+        metadata = _bundle_metadata_for_cartridge(manifest)
+        colophon = _bundle_colophon(manifest)
+        image = fmt.build_cartridge(
+            zf.read(file_name),
+            metadata=metadata,
+            icon=icon,
+            screenshot=splash,
+            colophon=colophon,
+            architecture=architecture,
+        )
+        parsed = fmt.parse_cartridge(image)
+        prepared.append(
+            {
+                "manifest": manifest,
+                "architecture": architecture,
+                "file": file_name,
+                "image": image,
+                "parsed": parsed,
+            }
+        )
+    return prepared
+
+
+def _read_manifest(zf: zipfile.ZipFile) -> dict[str, Any]:
+    try:
+        manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise StoreError("manifest.json must be valid UTF-8 JSON") from exc
+    if not isinstance(manifest, dict):
+        raise StoreError("manifest.json must contain a JSON object")
+    return manifest
+
+
+def _manifest_filename(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise StoreError(f"{label} is required")
+    filename = value.strip()
+    if filename.startswith("/") or ".." in Path(filename).parts:
+        raise StoreError(f"{label} must be a relative filename")
+    return filename
+
+
+def _bundle_metadata_for_cartridge(manifest: dict[str, Any]) -> dict[str, Any]:
+    metadata = deepcopy(manifest)
+    metadata.pop("assets", None)
+    metadata.pop("architectures", None)
+    metadata.pop("colophon", None)
+    return metadata
+
+
+def _bundle_colophon(manifest: dict[str, Any]) -> dict[str, Any] | None:
+    raw = manifest.get("colophon")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise StoreError("manifest.colophon must be an object")
+    colophon = deepcopy(raw)
+    colophon.setdefault("abi", fmt.COLOPHON_ABI)
+    colophon.setdefault("title", manifest.get("title", ""))
+    colophon.setdefault("version", manifest.get("version", ""))
+    colophon.setdefault("subtitle", colophon.get("text", ""))
+    if "developer" not in colophon:
+        authors = manifest.get("authors") if isinstance(manifest.get("authors"), list) else []
+        developer_name = "PRG32"
+        if authors and isinstance(authors[0], dict) and authors[0].get("name"):
+            developer_name = str(authors[0]["name"])
+        colophon["developer"] = {"name": developer_name}
+    colophon.setdefault("authors", colophon.get("credits", []))
+    colophon.setdefault("controls", [])
+    return colophon
+
+
+def _publish_prepared_bundle(store: GameStore, prepared: list[dict[str, Any]]) -> None:
+    index_existed = store.index_path.exists()
+    index_backup = store.index_path.read_bytes() if index_existed else b""
+    file_backups: dict[Path, bytes | None] = {}
+    try:
+        for item in prepared:
+            metadata = item["parsed"].metadata or {}
+            game_id = safe_game_id(metadata["id"])
+            version = safe_version(metadata["version"])
+            path = store.cartridge_dir / game_id / version / f"{item['architecture']}.prg32"
+            if path not in file_backups:
+                file_backups[path] = path.read_bytes() if path.exists() else None
+            publish_cartridge_image(store, item["image"], item["architecture"])
+    except Exception:
+        if index_existed:
+            store.index_path.write_bytes(index_backup)
+        elif store.index_path.exists():
+            store.index_path.unlink()
+        for path, data in file_backups.items():
+            if data is None:
+                if path.exists():
+                    path.unlink()
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+        raise
 
 
 if __name__ == "__main__":

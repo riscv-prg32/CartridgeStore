@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile_user.username }} Runs - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>{{ profile_user.username }} Runs</h1>
+  <table>
+    <thead>
+      <tr><th>Run ID</th><th>Board</th><th>Target</th><th>Frames</th><th>Mean frame_us</th><th>p95 frame_us</th><th>Finished</th></tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><a href="/users/{{ profile_user.username }}/runs/{{ run.run_id }}">{{ run.run_id }}</a></td>
+        <td>{{ run.board_id }}</td>
+        <td>{{ run.target }}</td>
+        <td>{{ run.sample_count }}</td>
+        <td>{{ "%.1f"|format(run.mean_frame_us) }}</td>
+        <td>{{ "%.1f"|format(run.p95_frame_us) }}</td>
+        <td>{{ run.finished_at or "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">No runs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

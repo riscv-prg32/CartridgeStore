@@ -10,9 +10,6 @@ development, classroom demos, and quick service validation.
 - Docker Engine and Docker Compose v2, if you want container deployment.
 - A shell with `python3`, `pip`, and `pytest` available after setup.
 
-The service uses Flask for HTTP/PWA routes, SQLite for score and metrics data,
-and a WebSocket endpoint for multiplayer relay traffic.
-
 ## Clone
 
 ```bash
@@ -22,8 +19,6 @@ cd CartridgeStore
 
 ## Python Virtual Environment
 
-Create the virtual environment inside the repository:
-
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
@@ -31,18 +26,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Confirm the environment:
-
-```bash
-python --version
-python -m pytest -q
-```
-
-The exact test count can grow as tests are added, but the suite should pass.
-
 ## Local Data Directory
-
-Use a repository-local data directory for development:
 
 ```bash
 mkdir -p data
@@ -50,61 +34,84 @@ export PRG32_STORE_DATA="$PWD/data"
 export PRG32_STORE_DB="$PWD/data/cartrige_store.sqlite"
 ```
 
-The directory stores:
+The directory stores uploaded cartridges under `data/cartridges`, custom theme
+assets under `data/static`, the catalog index in `data/index.json`, and service
+tables in `data/cartrige_store.sqlite`.
 
-- uploaded cartridge artifacts under `data/cartridges`;
-- the extracted catalog index in `data/index.json`;
-- score and metrics tables in `data/cartrige_store.sqlite`.
+## First-Run Setup
 
-## Optional Users and Roles
-
-Open classroom mode is the default. To require tokens for write operations, set
-`PRG32_USERS` before starting the service:
+`SECRET_KEY` is required. Generate one for development:
 
 ```bash
-export PRG32_USERS='teacher:admin:teach-secret,board:player:board-secret'
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 ```
 
-Use a `player` token for board score, metrics, and multiplayer writes. Use a
-`publisher` or `admin` token for cartridge publishing.
-
-## Run Locally
+Start the server:
 
 ```bash
 python app.py
 ```
 
-Open:
+Open `http://127.0.0.1:5080/auth/register` and create the first account. The
+first registered user automatically receives the `admin` role. Visit `/setup`
+as that user to change the store name, theme, auth defaults, logo, and publish
+settings.
 
-```text
-http://127.0.0.1:5080/
-```
-
-The development entrypoint binds to localhost. For LAN classroom access without
-Docker, run a WSGI server explicitly:
+## Run Checks
 
 ```bash
-gunicorn --bind 0.0.0.0:5080 --threads 8 --timeout 120 app:app
+python -m py_compile app.py cartridge_store/*.py
+python -m pytest -q
+git diff --check
 ```
 
-## Verify Service Discovery
+## Publish and Scores
+
+`POST /api/publish`, `POST /api/publish/bundle`, and `POST /api/scores` require
+a logged-in browser session or Bearer token. Create a token at `/auth/tokens`
+or with:
 
 ```bash
-curl http://127.0.0.1:5080/.well-known/prg32-store.json
+curl -X POST http://127.0.0.1:5080/auth/tokens \
+  -b cookies.txt -c cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"label":"board"}'
 ```
 
-The response should include `services.cartridges`, `services.scores`,
-`services.metrics`, and `services.multiplayer`.
-
-## Smoke Test Scores
+Then submit scores:
 
 ```bash
 curl -X POST http://127.0.0.1:5080/api/scores \
+  -H "Authorization: Bearer prg32_..." \
   -H 'Content-Type: application/json' \
   -d '{"game":"pong","player":"Ada","score":42}'
-
-curl http://127.0.0.1:5080/api/scores?game=pong
 ```
+
+Metrics ingestion remains open for firmware compatibility. Authenticated runs
+are linked to the submitting user and appear under `/users/<username>/runs`.
+
+## External Auth
+
+Local username/password login always works. External adapters activate only
+when their environment variables are set and their optional libraries are
+installed:
+
+- LDAP / Active Directory: set `PRG32_LDAP_URL` and related LDAP variables;
+  install `ldap3`.
+- SAML 2.0: set `PRG32_SAML_IDP_METADATA_URL`, SP entity/ACS values, and
+  install `python3-saml`.
+- OpenID Connect: set `PRG32_OIDC_ISSUER`, client id/secret, and install
+  `authlib`.
+
+If an adapter is configured but its library is absent, startup logs a warning
+and local login remains available.
+
+## Theme Customisation
+
+Visit `/setup` as an admin to change colors, font family, store name, tagline,
+logo URL, favicon URL, and custom CSS. Upload PNG, JPEG, or SVG logos with the
+logo and favicon forms; files are stored under `data/static` and served from
+`/static/custom/<filename>`.
 
 ## Smoke Test Metrics
 
@@ -120,72 +127,13 @@ curl -X POST http://127.0.0.1:5080/api/metrics/batch \
 curl http://127.0.0.1:5080/api/runs/demo-run/report.md
 ```
 
-Missing sample fields default to zero so short smoke-test payloads are accepted.
-
-## Smoke Test Multiplayer
-
-The multiplayer endpoint is:
-
-```text
-ws://127.0.0.1:5080/api/multiplayer
-```
-
-Clients send JSON messages:
-
-```json
-{"type":"join","signature":"pong-v1","player_id":1}
-{"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
-{"type":"leave"}
-```
-
-Clients with the same signature share state. Different signatures are isolated.
-
 ## Docker Environment
 
-For the most reproducible local deployment, use Docker Compose:
+For reproducible local deployment:
 
 ```bash
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose up --build
 ```
 
-Open:
-
-```text
-http://127.0.0.1:5080/
-```
-
-Stop the service:
-
-```bash
-docker compose down
-```
-
-Persistent data remains in `./data`.
-
-## Common Environment Variables
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PRG32_STORE_DATA` | `data` or `/data` in Docker | Cartridge files and default database location |
-| `PRG32_STORE_DB` | `<data>/cartrige_store.sqlite` | Unified SQLite database |
-| `PRG32_SCORE_DB` | unset | Legacy score database fallback |
-| `PRG32_METRICS_DB` | unset | Legacy metrics database fallback |
-| `PRG32_MP_MAX_PEERS` | `8` | Maximum WebSocket peers per cartridge signature |
-| `PRG32_USERS` | unset | Optional `name:role:token` list or JSON user config |
-
-## Development Checks
-
-Run these before committing:
-
-```bash
-python -m py_compile app.py cartridge_store/*.py
-python -m pytest -q
-git diff --check
-```
-
-For Docker changes:
-
-```bash
-docker compose config
-docker build -t prg32-cartrige-store:local .
-```
+Open `http://127.0.0.1:5080/`. Persistent data remains in `./data`.

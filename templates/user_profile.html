@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile_user.username }} - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="table-panel">
+  <h1>{{ profile_user.username }}</h1>
+  <p>Role: {{ profile_user.role }}</p>
+  <p>Runs: {{ run_count }}</p>
+  {% if can_view_runs %}<a class="button" href="/users/{{ profile_user.username }}/runs">View Runs</a>{% endif %}
+</section>
+{% endblock %}

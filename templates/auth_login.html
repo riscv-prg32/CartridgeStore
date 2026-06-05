@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Login - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="auth-panel">
+  <h1>Login</h1>
+  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+  <form method="post" action="/auth/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Username or Email<input name="username" autocomplete="username" required></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Login</button>
+  </form>
+  <p><a href="/auth/register">Create an account</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="toolbar">
+  <form class="search" method="get" action="/stats">
+    <input name="since" value="{{ query.since }}" placeholder="Since YYYY-MM-DD">
+    <input name="until" value="{{ query.until }}" placeholder="Until YYYY-MM-DD">
+    <select name="granularity">
+      <option value="day" {% if query.granularity == "day" %}selected{% endif %}>day</option>
+      <option value="week" {% if query.granularity == "week" %}selected{% endif %}>week</option>
+      <option value="month" {% if query.granularity == "month" %}selected{% endif %}>month</option>
+    </select>
+    <button type="submit">Apply</button>
+  </form>
+</section>
+
+<section class="chart-panel">
+  <h1>Downloads</h1>
+  {{ trend_chart | safe }}
+  <table>
+    <thead><tr><th>Date</th><th>Downloads</th></tr></thead>
+    <tbody>
+      {% for item in summary.series %}
+      <tr><td>{{ item.date }}</td><td>{{ item.downloads }}</td></tr>
+      {% else %}
+      <tr><td colspan="2">No downloads yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="split">
+  <div>
+    <h2>Top Games</h2>
+    <table>
+      <thead><tr><th>Title</th><th>Downloads</th><th>Last Published</th></tr></thead>
+      <tbody>
+        {% for game in summary.top_games %}
+        <tr><td>{{ game.title }}</td><td>{{ game.downloads }}</td><td>{{ game.last_published }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No downloads yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <h2>Active Runs</h2>
+    <p class="stat-number">{{ active_runs_last_week }}</p>
+    {{ arch_chart | safe }}
+  </div>
+</section>
+{% endblock %}
