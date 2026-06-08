@@ -49,8 +49,9 @@ def test_mdns_registers_prg32_service(tmp_path, monkeypatch) -> None:
             registered["server"] = server
 
     class FakeZeroconf:
-        def register_service(self, info):
+        def register_service(self, info, **kwargs):
             registered["info"] = info
+            registered["register_kwargs"] = kwargs
 
         def unregister_service(self, info):
             registered["unregistered"] = info

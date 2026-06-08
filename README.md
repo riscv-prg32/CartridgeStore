@@ -202,7 +202,60 @@ pytest -q
 
 ## Documentation
 
-- [Getting started](docs/getting_started.md)
-- [Docker deployment](docs/docker.md)
-- [Unified service API](docs/api.md)
-- [Operations](docs/operations.md)
+Start here:
+
+- [Getting started](docs/getting_started.md): local Python setup, first-run
+  Store configuration, default administrator login, package upload and review,
+  score submission, metrics smoke tests, mDNS, SMTP, external auth, and theme
+  customization.
+- [Getting started with PRG32 game development](docs/getting_started_game_development.md):
+  host tool installation on Windows, Linux, and macOS; PlatformIO and ESP-IDF
+  setup; creating a hello world cartridge from scratch; running it in QEMU;
+  uploading it to ESP32-C6 hardware; packaging and publishing it to the Store.
+
+Operate and deploy the Store:
+
+- [Docker deployment](docs/docker.md): Docker Compose quick start, persistent
+  `/data` storage, manual `docker run`, classroom LAN URLs, mDNS behavior,
+  full backup/restore, logs, restarts, and data reset.
+- [Deployment](docs/deployment.md): production environment variables,
+  reverse-proxy notes, WebSocket proxying, SMTP, OIDC, SAML2, mDNS, backup
+  expectations, and production hardening checklist.
+- [Operations](docs/operations.md): daily classroom operations, backup and
+  restore, health checks, publishing workflow, user registration, admin pages,
+  access-token rotation, logs, network checks, and full data reset.
+
+Integrate with clients and tools:
+
+- [Unified service API](docs/api.md): discovery document, auth endpoints,
+  admin endpoints, cartridge package format, editor verification API, scores,
+  metrics, statistics, multiplayer, and compatibility notes.
+
+What to read for common tasks:
+
+- Run the Store locally: [Getting started](docs/getting_started.md).
+- Deploy the Store with Docker: [Docker deployment](docs/docker.md).
+- Deploy the Store behind HTTPS: [Deployment](docs/deployment.md).
+- Administer users, groups, cartridges, setup, or backups:
+  [Operations](docs/operations.md).
+- Create a new PRG32 game cartridge:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Publish a cartridge package: [Getting started](docs/getting_started.md) for
+  the browser flow, or [Unified service API](docs/api.md) for the API flow.
+- Build firmware or prepare PlatformIO/ESP-IDF:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Run a cartridge in QEMU:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Upload a cartridge to physical hardware:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Perform performance or metrics tests: [Getting started](docs/getting_started.md)
+  for a smoke test, [Unified service API](docs/api.md) for ingestion endpoints,
+  and [Operations](docs/operations.md) for service checks.
+- Contribute to game development:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Contribute to firmware development:
+  [Getting started with PRG32 game development](docs/getting_started_game_development.md)
+  for PlatformIO/ESP-IDF setup, then use the firmware SDK's own contribution
+  guide for board-specific internals.
+- Integrate firmware, launchers, classroom dashboards, or CI tools:
+  [Unified service API](docs/api.md).
