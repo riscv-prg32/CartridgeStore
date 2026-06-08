@@ -6,6 +6,10 @@
 <section class="toolbar">
   <form class="search" method="get" action="/">
     <input name="q" value="{{ q }}" placeholder="Search title, author, tag">
+    <label class="per-page-control">
+      <span>Per page</span>
+      <input name="per_page" type="number" min="1" max="100" value="{{ pagination.per_page }}">
+    </label>
     <button type="submit">Search</button>
   </form>
 </section>
@@ -34,4 +38,26 @@
   <p class="empty">No cartridges published yet.</p>
   {% endfor %}
 </section>
+
+{% if pagination.total > 0 %}
+<nav class="pagination" aria-label="Catalog pages">
+  <p>
+    Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}-{{ [pagination.page * pagination.per_page, pagination.total] | min }}
+    of {{ pagination.total }} cartridges
+  </p>
+  <div class="pagination-links">
+    {% if pagination.has_prev %}
+    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.prev_page) }}">Previous</a>
+    {% else %}
+    <span class="button secondary disabled" aria-disabled="true">Previous</span>
+    {% endif %}
+    <span class="page-count">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.next_page) }}">Next</a>
+    {% else %}
+    <span class="button secondary disabled" aria-disabled="true">Next</span>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
 {% endblock %}

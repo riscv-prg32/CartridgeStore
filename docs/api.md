@@ -122,6 +122,18 @@ the external provider id and email address.
 
 Download requests accept `version` and `architecture` query parameters.
 
+`GET /api/games` accepts optional browsing parameters:
+
+| Parameter | Purpose |
+| --- | --- |
+| `q` or `search` | Filter by title, summary, author, or tag |
+| `page` | Page number, starting at `1` |
+| `per_page` or `limit` | Maximum games returned per page, capped at `100` |
+
+The response keeps the legacy top-level `games` list and adds a `pagination`
+object with `page`, `per_page`, `total`, `pages`, `has_next`, `has_prev`,
+`next_page`, and `prev_page`.
+
 ## Bundle Publish
 
 ```http

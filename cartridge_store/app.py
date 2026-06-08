@@ -55,6 +55,8 @@ from .users import register_user_routes
 
 
 DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
+DEFAULT_CATALOG_PER_PAGE = 24
+MAX_CATALOG_PER_PAGE = 100
 
 
 class CartridgeRequest(FlaskRequest):
@@ -63,6 +65,39 @@ class CartridgeRequest(FlaskRequest):
         if self.path in {"/api/publish/bundle", "/api/publish", "/publish"}:
             return int(current_app.config["BUNDLE_MAX_CONTENT_LENGTH"])
         return super().max_content_length
+
+
+def _catalog_pagination(
+    items: list[dict[str, Any]],
+    *,
+    default_per_page: int | None = DEFAULT_CATALOG_PER_PAGE,
+    max_per_page: int | None = MAX_CATALOG_PER_PAGE,
+) -> dict[str, Any]:
+    page = max(request.args.get("page", default=1, type=int) or 1, 1)
+    per_page = request.args.get("per_page", type=int)
+    if per_page is None:
+        per_page = request.args.get("limit", default=default_per_page, type=int)
+    if per_page is None:
+        per_page = max(len(items), 1)
+    per_page = max(per_page or 1, 1)
+    if max_per_page is not None:
+        per_page = min(per_page, max_per_page)
+    total = len(items)
+    pages = max((total + per_page - 1) // per_page, 1)
+    page = min(page, pages)
+    start = (page - 1) * per_page
+    end = start + per_page
+    return {
+        "items": items[start:end],
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": pages,
+        "has_next": page < pages,
+        "has_prev": page > 1,
+        "next_page": page + 1 if page < pages else None,
+        "prev_page": page - 1 if page > 1 else None,
+    }
 
 
 def create_app(test_config: dict[str, Any] | None = None) -> Flask:
@@ -144,10 +179,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/")
     def index():
         q = request.args.get("q", "")
+        games = store.list_games(q)
+        pagination = _catalog_pagination(games)
         return render_template(
             "index.html",
-            games=store.list_games(q),
+            games=pagination["items"],
             q=q,
+            pagination=pagination,
         )
 
     @app.get("/games/<game_id>")
@@ -508,7 +546,32 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.get("/api/games")
     def api_games():
         q = request.args.get("q") or request.args.get("search")
-        return jsonify({"ok": True, "games": store.list_games(q)})
+        games = store.list_games(q)
+        paginate_api = any(name in request.args for name in ("page", "per_page", "limit"))
+        pagination = _catalog_pagination(
+            games,
+            default_per_page=DEFAULT_CATALOG_PER_PAGE if paginate_api else None,
+            max_per_page=MAX_CATALOG_PER_PAGE if paginate_api else None,
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "games": pagination["items"],
+                "pagination": {
+                    key: pagination[key]
+                    for key in (
+                        "page",
+                        "per_page",
+                        "total",
+                        "pages",
+                        "has_next",
+                        "has_prev",
+                        "next_page",
+                        "prev_page",
+                    )
+                },
+            }
+        )
 
     @app.get("/api/games/<game_id>")
     def api_game(game_id: str):

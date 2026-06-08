@@ -94,6 +94,25 @@ def verify_submission(client, submission_id: int, metadata_updates: dict | None 
     )
 
 
+def publish_verified_game(client, game_id: str, title: str) -> None:
+    manifest = {
+        **metadata(),
+        "id": game_id,
+        "title": title,
+        "assets": {"icon": "icon.png"},
+        "architectures": [{"id": "esp32c6", "file": "game-esp32c6.prg32"}],
+        "colophon": {**colophon(), "title": title},
+    }
+    response = client.post(
+        "/api/publish/bundle",
+        data={"bundle": (io.BytesIO(bundle_bytes(manifest=manifest)), "bundle.zip")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    verified = verify_submission(client, response.get_json()["submission_id"])
+    assert verified.status_code == 200
+
+
 def test_publish_list_and_download(client) -> None:
     response = upload_bundle(client)
     assert response.status_code == 200
@@ -111,6 +130,50 @@ def test_publish_list_and_download(client) -> None:
     assert download.status_code == 200
     assert download.data.startswith(b"PRG2")
     assert b"PRG32META" in download.data
+
+
+def test_api_games_paginates(client) -> None:
+    for index in range(5):
+        publish_verified_game(client, f"org.example.page{index}", f"Page Game {index}")
+
+    unpaginated = client.get("/api/games").get_json()
+    assert len(unpaginated["games"]) == 5
+    assert unpaginated["pagination"]["per_page"] == 5
+
+    first_page = client.get("/api/games?per_page=2&page=1").get_json()
+    assert first_page["ok"] is True
+    assert [game["id"] for game in first_page["games"]] == [
+        "org.example.page0",
+        "org.example.page1",
+    ]
+    assert first_page["pagination"] == {
+        "page": 1,
+        "per_page": 2,
+        "total": 5,
+        "pages": 3,
+        "has_next": True,
+        "has_prev": False,
+        "next_page": 2,
+        "prev_page": None,
+    }
+
+    last_page = client.get("/api/games?limit=2&page=3").get_json()
+    assert [game["id"] for game in last_page["games"]] == ["org.example.page4"]
+    assert last_page["pagination"]["page"] == 3
+    assert last_page["pagination"]["has_next"] is False
+
+
+def test_index_paginates_catalog(client) -> None:
+    for index in range(3):
+        publish_verified_game(client, f"org.example.ui{index}", f"UI Game {index}")
+
+    page = client.get("/?per_page=2&page=1")
+    assert page.status_code == 200
+    assert "UI Game 0" in page.text
+    assert "UI Game 1" in page.text
+    assert "UI Game 2" not in page.text
+    assert "Page 1 of 2" in page.text
+    assert "page=2" in page.text
 
 
 def test_colophon_endpoint(client) -> None:

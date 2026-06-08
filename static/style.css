@@ -126,8 +126,18 @@ a {
 }
 
 .search {
+  align-items: flex-end;
   display: flex;
   gap: 10px;
+}
+
+.per-page-control {
+  color: var(--muted);
+  display: grid;
+  flex: 0 0 120px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  gap: 4px;
 }
 
 input,
@@ -174,6 +184,24 @@ button:hover,
   background: var(--color-secondary);
 }
 
+.button.secondary {
+  background: #edf2ee;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.button.secondary:hover {
+  background: #dfe8e3;
+}
+
+.button.disabled,
+.button.disabled:hover {
+  background: #edf2ee;
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.75;
+}
+
 .primary {
   background: var(--accent-2);
   margin-top: 16px;
@@ -184,6 +212,30 @@ button:hover,
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.pagination p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.pagination-links {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.page-count {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .game-card {
@@ -484,9 +536,21 @@ svg {
 @media (max-width: 700px) {
   .topbar,
   .search,
+  .pagination,
   .detail-head,
   .split {
     grid-template-columns: 1fr;
+  }
+
+  .search,
+  .pagination,
+  .pagination-links {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .per-page-control {
+    flex-basis: auto;
   }
 
   .topbar {
