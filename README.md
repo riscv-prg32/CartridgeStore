@@ -124,7 +124,9 @@ curl -X POST http://localhost:5080/api/scores \
 ```
 
 Use `?game=<name>` to filter scores for one game and `?limit=<n>` to choose a
-result limit between 1 and 100.
+result limit between 1 and 100. Add `?player=<name>` to show scores for one
+player. The browser scoreboard is available from the navigation bar at
+`/scores` and accepts the same `game`, `player`, and `limit` query filters.
 
 ## Metrics
 

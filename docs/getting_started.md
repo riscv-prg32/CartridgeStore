@@ -124,6 +124,9 @@ curl -X POST http://127.0.0.1:5080/api/scores \
   -d '{"game":"pong","player":"Ada","score":42}'
 ```
 
+View the classroom scoreboard at `http://127.0.0.1:5080/scores`. It accepts
+the same filters as the API, for example `/scores?game=pong&player=Ada`.
+
 Metrics ingestion remains open for firmware compatibility. Authenticated runs
 are linked to the submitting user and appear under `/users/<username>/runs`.
 

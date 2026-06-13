@@ -151,6 +151,12 @@ def test_score_api_round_trip(tmp_path) -> None:
     assert scores[0]["score"] == 42
     assert scores[0]["submitted_by"] == "admin"
 
+    page = client.get("/scores?game=pong&player=Ada")
+    assert page.status_code == 200
+    assert "Scoreboard" in page.text
+    assert "Ada" in page.text
+    assert "42" in page.text
+
 
 def test_metrics_api_round_trip_and_export(tmp_path) -> None:
     client = make_client(tmp_path)

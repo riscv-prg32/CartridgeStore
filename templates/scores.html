@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Scores - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="toolbar">
+  <form class="search" method="get" action="/scores">
+    <input name="game" value="{{ game }}" placeholder="Game id">
+    <input name="player" value="{{ player }}" placeholder="Player name">
+    <select name="limit">
+      {% for option in [20, 50, 100] %}
+      <option value="{{ option }}" {% if limit == option %}selected{% endif %}>{{ option }} scores</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Apply</button>
+  </form>
+</section>
+
+<section class="chart-panel">
+  <h1>Scoreboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Game</th>
+        <th>Player</th>
+        <th>Score</th>
+        <th>Submitted By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for score in scores %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><a href="/games/{{ score.game }}">{{ score.game }}</a></td>
+        <td>{{ score.player }}</td>
+        <td>{{ score.score }}</td>
+        <td>{{ score.submitted_by or "device" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">No scores yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

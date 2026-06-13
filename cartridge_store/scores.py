@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 from .auth import current_principal, login_required
 from .database import add_column_if_missing, get_db
@@ -40,30 +40,62 @@ def register_score_routes(app: Flask) -> None:
     @app.get("/api/scores")
     def list_scores():
         game = request.args.get("game")
+        player = request.args.get("player")
         limit = min(max(request.args.get("limit", default=20, type=int), 1), 100)
         db = get_db()
+        where = []
+        params: list[object] = []
         if game:
-            rows = db.execute(
-                """
-                SELECT game, player, score, created_at, submitted_by
-                FROM scores
-                WHERE game = ?
-                ORDER BY score DESC, created_at ASC
-                LIMIT ?
-                """,
-                (game, limit),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                """
-                SELECT game, player, score, created_at, submitted_by
-                FROM scores
-                ORDER BY score DESC, created_at ASC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+            where.append("game = ?")
+            params.append(game)
+        if player:
+            where.append("player = ?")
+            params.append(player)
+        where_sql = "WHERE " + " AND ".join(where) if where else ""
+        rows = db.execute(
+            f"""
+            SELECT game, player, score, created_at, submitted_by
+            FROM scores
+            {where_sql}
+            ORDER BY score DESC, created_at ASC
+            LIMIT ?
+            """,
+            (*params, limit),
+        ).fetchall()
         return jsonify([dict(row) for row in rows])
+
+    @app.get("/scores")
+    def score_page():
+        game = request.args.get("game", "").strip()
+        player = request.args.get("player", "").strip()
+        limit = min(max(request.args.get("limit", default=50, type=int), 1), 100)
+        db = get_db()
+        where = []
+        params: list[object] = []
+        if game:
+            where.append("game = ?")
+            params.append(game)
+        if player:
+            where.append("player = ?")
+            params.append(player)
+        where_sql = "WHERE " + " AND ".join(where) if where else ""
+        rows = db.execute(
+            f"""
+            SELECT game, player, score, created_at, submitted_by
+            FROM scores
+            {where_sql}
+            ORDER BY score DESC, created_at ASC
+            LIMIT ?
+            """,
+            (*params, limit),
+        ).fetchall()
+        return render_template(
+            "scores.html",
+            scores=[dict(row) for row in rows],
+            game=game,
+            player=player,
+            limit=limit,
+        )
 
     @app.post("/api/scores")
     @login_required

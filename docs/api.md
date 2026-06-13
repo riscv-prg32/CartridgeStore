@@ -240,7 +240,9 @@ curl -X POST http://host:5080/api/submissions/7/reject \
 The score API is compatible with the standalone PRG32 ScoreServer.
 
 ```http
+GET /scores?game=pong&player=Ada&limit=20
 GET /api/scores?game=pong&limit=20
+GET /api/scores?game=pong&player=Ada&limit=20
 POST /api/scores
 ```
 
@@ -251,6 +253,8 @@ Submit JSON with a session or Bearer token:
 ```
 
 Scores are ordered by highest score first, then oldest timestamp first.
+The browser scoreboard is available at `/scores` and accepts the same `game`,
+`player`, and `limit` filters.
 
 ## Metrics
 
