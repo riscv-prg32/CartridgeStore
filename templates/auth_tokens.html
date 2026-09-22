@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Publication Tokens - {{ store_name }}{% endblock %}
+{% block content %}
+<section class="auth-panel token-manager">
+  <h1>Publication tokens</h1>
+  <p>Create a token for command-line tools that submit cartridge packages. Tokens use your account and can be revoked at any time.</p>
+
+  {% if created_token %}
+  <div class="token-secret" role="status">
+    <strong>Copy this token now.</strong> It will not be shown again.
+    <code>{{ created_token }}</code>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/auth/tokens">
+    <label>Token label<input name="label" maxlength="80" placeholder="Development laptop" required></label>
+    <button type="submit">Create token</button>
+  </form>
+</section>
+
+<section class="table-panel">
+  <h2>Your tokens</h2>
+  {% if tokens %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Label</th><th>Created</th><th>Last used</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for token in tokens %}
+        <tr>
+          <td>
+            <form method="post" action="/auth/tokens/{{ token.id }}/update" class="token-inline-form">
+              <input name="label" value="{{ token.label }}" maxlength="80" required aria-label="Token label">
+              <button type="submit">Rename</button>
+            </form>
+          </td>
+          <td>{{ token.created_at }}</td>
+          <td>{{ token.last_used or "Never" }}</td>
+          <td>
+            <form method="post" action="/auth/tokens/{{ token.id }}/revoke" onsubmit="return confirm('Revoke this token?');">
+              <button type="submit" class="danger">Revoke</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No publication tokens yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

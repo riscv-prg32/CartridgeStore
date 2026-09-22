@@ -430,6 +430,66 @@ def test_api_token_can_publish(tmp_path) -> None:
     assert game["publisher"] == "admin"
 
 
+def test_logged_in_developer_can_manage_publication_tokens(tmp_path) -> None:
+    app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
+    developer = app.test_client()
+    login_default_admin(developer)
+
+    page = developer.get("/auth/tokens")
+    assert page.status_code == 200
+    assert b"Publication tokens" in page.data
+
+    created = developer.post("/auth/tokens", json={"label": "Build machine"})
+    assert created.status_code == 200
+    token_id = created.get_json()["id"]
+    token_value = created.get_json()["token"]
+
+    listed = developer.get("/auth/tokens", headers={"Accept": "application/json"})
+    assert listed.status_code == 200
+    assert listed.get_json()["tokens"] == [
+        {
+            "id": token_id,
+            "label": "Build machine",
+            "created_at": listed.get_json()["tokens"][0]["created_at"],
+            "last_used": "",
+        }
+    ]
+    assert token_value not in listed.get_data(as_text=True)
+
+    renamed = developer.patch(
+        f"/auth/tokens/{token_id}",
+        json={"label": "Release laptop"},
+    )
+    assert renamed.status_code == 200
+    assert renamed.get_json()["label"] == "Release laptop"
+
+    revoked = developer.delete(f"/auth/tokens/{token_id}")
+    assert revoked.status_code == 200
+    assert revoked.get_json() == {"ok": True}
+    assert developer.get(
+        "/auth/tokens", headers={"Accept": "application/json"}
+    ).get_json()["tokens"] == []
+
+
+def test_developer_cannot_manage_another_users_token(tmp_path) -> None:
+    app = create_app({"TESTING": True, "DATA_DIR": str(tmp_path / "data")})
+    owner = app.test_client()
+    login_default_admin(owner)
+    token_id = owner.post("/auth/tokens", json={"label": "Owner"}).get_json()["id"]
+
+    other = app.test_client()
+    register(other, "developer@example.test")
+    renamed = other.patch(f"/auth/tokens/{token_id}", json={"label": "Stolen"})
+    revoked = other.delete(f"/auth/tokens/{token_id}")
+
+    assert renamed.status_code == 404
+    assert revoked.get_json() == {"ok": False}
+    tokens = owner.get(
+        "/auth/tokens", headers={"Accept": "application/json"}
+    ).get_json()["tokens"]
+    assert tokens[0]["label"] == "Owner"
+
+
 def test_setup_theme_and_logo(tmp_path) -> None:
     client = make_client(tmp_path)
 

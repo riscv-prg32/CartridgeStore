@@ -31,7 +31,9 @@ email address.
 | `GET/POST` | `/auth/login` | Authenticate and set the session cookie |
 | `POST` | `/auth/logout` | Clear the session |
 | `GET` | `/auth/me` | Current user JSON |
+| `GET` | `/auth/tokens` | List your Bearer tokens or open the token manager |
 | `POST` | `/auth/tokens` | Create a Bearer token |
+| `PATCH` | `/auth/tokens/<id>` | Rename one of your tokens |
 | `DELETE` | `/auth/tokens/<id>` | Revoke one of your tokens |
 | `GET` | `/auth/oidc/login` | Start OIDC login when configured |
 | `GET` | `/auth/oidc/callback` | OIDC callback when configured |

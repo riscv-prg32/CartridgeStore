@@ -368,6 +368,31 @@ h2 {
   margin-top: 18px;
 }
 
+.token-secret {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--panel));
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  margin: 16px 0;
+  padding: 14px;
+}
+
+.token-secret code {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.token-inline-form {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.token-inline-form input {
+  min-width: 12rem;
+}
+
 .split {
   display: grid;
   gap: 24px;

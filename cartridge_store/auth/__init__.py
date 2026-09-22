@@ -540,6 +540,28 @@ def _token_response(token_id: int, label: str, token: str) -> dict[str, Any]:
     return {"ok": True, "id": token_id, "label": label, "token": token}
 
 
+def _token_record(row: Any) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "label": str(row["label"] or "API token"),
+        "created_at": str(row["created_at"]),
+        "last_used": str(row["last_used"] or ""),
+    }
+
+
+def _tokens_for_user(user_id: int) -> list[dict[str, Any]]:
+    rows = get_db().execute(
+        """
+        SELECT id, label, created_at, last_used
+        FROM api_tokens
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [_token_record(row) for row in rows]
+
+
 def _normalize_email(email: str) -> str:
     return str(email or "").strip().lower()
 
@@ -800,6 +822,14 @@ def register_auth_routes(app: Flask) -> None:
     def auth_me():
         return jsonify({"ok": True, "user": current_principal().as_dict()})
 
+    @app.get("/auth/tokens")
+    @login_required
+    def auth_tokens():
+        tokens = _tokens_for_user(int(current_principal().id))
+        if _wants_json():
+            return jsonify({"ok": True, "tokens": tokens})
+        return render_template("auth_tokens.html", tokens=tokens)
+
     @app.post("/auth/tokens")
     @login_required
     def auth_create_token():
@@ -815,7 +845,45 @@ def register_auth_routes(app: Flask) -> None:
             (principal.id, token_hash(token), label),
         )
         get_db().commit()
-        return jsonify(_token_response(int(cursor.lastrowid), label, token))
+        response = _token_response(int(cursor.lastrowid), label, token)
+        if request.is_json or _wants_json():
+            return jsonify(response)
+        return render_template(
+            "auth_tokens.html",
+            tokens=_tokens_for_user(int(principal.id)),
+            created_token=token,
+        )
+
+    @app.patch("/auth/tokens/<int:token_id>")
+    @login_required
+    def auth_update_token(token_id: int):
+        data = request.get_json(silent=True) or {}
+        label = str(data.get("label") or "").strip()[:80]
+        if not label:
+            return jsonify({"ok": False, "error": "label is required"}), 400
+        cursor = get_db().execute(
+            "UPDATE api_tokens SET label = ? WHERE id = ? AND user_id = ?",
+            (label, token_id, current_principal().id),
+        )
+        get_db().commit()
+        if cursor.rowcount == 0:
+            return jsonify({"ok": False, "error": "token not found"}), 404
+        return jsonify({"ok": True, "id": token_id, "label": label})
+
+    @app.post("/auth/tokens/<int:token_id>/update")
+    @login_required
+    def auth_update_token_form(token_id: int):
+        label = request.form.get("label", "").strip()[:80]
+        if not label:
+            flash("Token label is required.")
+        else:
+            cursor = get_db().execute(
+                "UPDATE api_tokens SET label = ? WHERE id = ? AND user_id = ?",
+                (label, token_id, current_principal().id),
+            )
+            get_db().commit()
+            flash("Token updated." if cursor.rowcount else "Token not found.")
+        return redirect(url_for("auth_tokens"))
 
     @app.delete("/auth/tokens/<int:token_id>")
     @login_required
@@ -826,6 +894,17 @@ def register_auth_routes(app: Flask) -> None:
         )
         get_db().commit()
         return jsonify({"ok": cursor.rowcount > 0})
+
+    @app.post("/auth/tokens/<int:token_id>/revoke")
+    @login_required
+    def auth_delete_token_form(token_id: int):
+        cursor = get_db().execute(
+            "DELETE FROM api_tokens WHERE id = ? AND user_id = ?",
+            (token_id, current_principal().id),
+        )
+        get_db().commit()
+        flash("Token revoked." if cursor.rowcount else "Token not found.")
+        return redirect(url_for("auth_tokens"))
 
     register_ldap_adapter(app)
     register_saml_adapter(app)
