@@ -15,6 +15,8 @@ storage mounted outside the container or process directory.
 | `PRG32_METRICS_DB` | unset | Legacy metrics DB fallback |
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
 | `PRG32_MP_MAX_PEERS` | `8` | WebSocket peers per multiplayer room |
+| `PRG32_THREADS` | `128` | Gunicorn threads; each open multiplayer WebSocket holds one |
+| `PRG32_BIND` | `0.0.0.0:5080` | Gunicorn bind address |
 | `PRG32_USERS` | unset | Legacy `name:role:token` compatibility tokens |
 | `PRG32_SMTP_HOST` | unset | SMTP host for registration emails |
 | `PRG32_SMTP_PORT` | `587` | SMTP port |
@@ -60,6 +62,8 @@ storage mounted outside the container or process directory.
   under `pending/`.
 - Configure reverse-proxy request size limits above `PRG32_BUNDLE_MAX_MB`.
 - Proxy WebSocket upgrades for `/api/multiplayer`.
+- Run Gunicorn with `--config gunicorn.conf.py`: one worker (multiplayer rooms
+  live in memory) and enough threads for every open WebSocket plus HTTP traffic.
 - Keep `zeroconf` installed if you want mDNS advertisement in production.
 
 Example Nginx WebSocket location:

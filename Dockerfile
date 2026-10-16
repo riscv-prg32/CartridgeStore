@@ -41,4 +41,5 @@ EXPOSE 5080
 #HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 #    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5080/.well-known/prg32-store.json', timeout=3).read()"
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5080", "--threads", "8", "--timeout", "120", "app:app"]
+# Thread count and the single-worker rule are explained in gunicorn.conf.py.
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]

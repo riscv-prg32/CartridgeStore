@@ -167,3 +167,17 @@ def test_chart_color_rejects_markup() -> None:
     assert _color('#"/><s') == "#1a73e8"
     assert _color("#abc") == "#abc"
     assert _color("#A1B2C3") == "#A1B2C3"
+
+
+def test_gunicorn_config_leaves_threads_for_websockets() -> None:
+    import runpy
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    config = runpy.run_path(str(root / "gunicorn.conf.py"))
+    # Rooms live in memory: a second worker would split players apart.
+    assert config["workers"] == 1
+    # Each open WebSocket holds a thread; a full room must not starve HTTP.
+    assert config["threads"] > 4 * 8
+    assert config["bind"].endswith(":5080")
+    assert '"--config", "gunicorn.conf.py"' in (root / "Dockerfile").read_text()
