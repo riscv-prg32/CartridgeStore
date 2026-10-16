@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from html import escape
+import re
 from typing import Any
 
 
@@ -14,8 +15,9 @@ def _num(value: Any) -> float:
 
 
 def _color(value: str) -> str:
+    # The color is interpolated into SVG markup, so accept only hex colors.
     text = str(value or "").strip()
-    if len(text) in (4, 7) and text.startswith("#"):
+    if re.fullmatch(r"#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})", text):
         return text
     return "#1a73e8"
 

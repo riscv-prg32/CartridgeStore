@@ -30,7 +30,7 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash
 
-from ..database import get_db
+from ..database import get_db, init_schema_once
 
 
 ROLE_LEVELS = {
@@ -246,20 +246,29 @@ def init_auth_db() -> None:
 
 
 def ensure_default_admin() -> None:
+    """Seed the bootstrap administrator only when the store has no admin.
+
+    Renaming or deleting the seeded account must not bring back a user with
+    the well-known default password, so nothing happens once any admin exists.
+    """
     db = get_db()
-    row = db.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
-    if row is None:
-        cursor = db.execute(
-            """
-            INSERT INTO users(username, email, password_hash, role)
-            VALUES (?, ?, ?, 'admin')
-            """,
-            ("admin", "admin@localhost", generate_password_hash("password")),
-        )
-        db.commit()
-        add_user_to_group(int(cursor.lastrowid), "editors")
+    if db.execute("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1").fetchone():
         return
-    add_user_to_group(int(row["id"]), "editors")
+    taken = db.execute(
+        "SELECT 1 FROM users WHERE username = 'admin' OR email = 'admin@localhost'"
+    ).fetchone()
+    if taken:
+        return
+    password = os.environ.get("PRG32_ADMIN_PASSWORD") or "password"
+    cursor = db.execute(
+        """
+        INSERT INTO users(username, email, password_hash, role)
+        VALUES (?, ?, ?, 'admin')
+        """,
+        ("admin", "admin@localhost", generate_password_hash(password)),
+    )
+    db.commit()
+    add_user_to_group(int(cursor.lastrowid), "editors")
 
 
 def principal_from_row(row: Any | None, *, token: str = "") -> Principal:
@@ -379,17 +388,16 @@ def upsert_external_user(
         (provider, external_id),
     ).fetchone()
     if row is None:
-        row = db.execute(
-            "SELECT id FROM users WHERE email = ? OR username = ?",
-            (email, username),
-        ).fetchone()
+        # Link by the IdP-asserted email only. Matching on username would let
+        # an IdP user named e.g. "admin" take over the local admin account.
+        row = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if row is None:
         cursor = db.execute(
             """
             INSERT INTO users(username, email, role, external_provider, external_id)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (username, email, role, provider, external_id),
+            (_unique_username(username, email), email, role, provider, external_id),
         )
         db.commit()
         return int(cursor.lastrowid)
@@ -403,6 +411,17 @@ def upsert_external_user(
     )
     db.commit()
     return int(row["id"])
+
+
+def _unique_username(preferred: str, email: str) -> str:
+    db = get_db()
+    for candidate in (preferred, email):
+        if not db.execute("SELECT 1 FROM users WHERE username = ?", (candidate,)).fetchone():
+            return candidate
+    suffix = 2
+    while db.execute("SELECT 1 FROM users WHERE username = ?", (f"{email}-{suffix}",)).fetchone():
+        suffix += 1
+    return f"{email}-{suffix}"
 
 
 def authenticate_token(token: str, users: Iterable[Principal] | None = None) -> Principal:
@@ -675,7 +694,7 @@ def register_auth_routes(app: Flask) -> None:
 
     @app.before_request
     def before_auth_request() -> None:
-        init_auth_db()
+        init_schema_once("auth", init_auth_db)
 
     @app.context_processor
     def inject_current_user() -> dict[str, Any]:
@@ -821,6 +840,13 @@ def register_auth_routes(app: Flask) -> None:
     @login_required
     def auth_me():
         return jsonify({"ok": True, "user": current_principal().as_dict()})
+
+    @app.before_request
+    def reject_token_management_without_account():
+        if request.path.startswith("/auth/tokens") and current_principal().authenticated:
+            if current_principal().id is None:
+                return _auth_failure("token management requires a database account", 403)
+        return None
 
     @app.get("/auth/tokens")
     @login_required

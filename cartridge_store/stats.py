@@ -12,7 +12,7 @@ from flask import Flask, jsonify, render_template, request
 
 from . import charts
 from .auth import current_principal
-from .database import get_db
+from .database import get_db, init_schema_once
 from .settings import get_setting
 from .store import GameStore, StoreError
 
@@ -248,7 +248,7 @@ def _runs_summary() -> dict[str, Any]:
 def register_stats_routes(app: Flask, store: GameStore) -> None:
     @app.before_request
     def before_stats_request() -> None:
-        init_stats_db()
+        init_schema_once("stats", init_stats_db)
 
     @app.get("/api/stats/downloads")
     def api_stats_downloads():

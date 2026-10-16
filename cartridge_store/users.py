@@ -35,6 +35,10 @@ def can_view_user(user: dict[str, Any]) -> bool:
 
 
 def can_view_run(run: dict[str, Any]) -> bool:
+    """Anonymous runs are open; owned runs belong to their owner and admins.
+
+    The metrics API uses the same rule to decide who may append to a run.
+    """
     owner = run.get("user_id")
     if owner is None:
         return True

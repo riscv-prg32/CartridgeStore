@@ -7,7 +7,7 @@ import time
 from flask import Flask, jsonify, render_template, request
 
 from .auth import current_principal, login_required
-from .database import add_column_if_missing, get_db
+from .database import add_column_if_missing, get_db, init_schema_once
 
 
 def init_scores_db() -> None:
@@ -35,7 +35,7 @@ def init_scores_db() -> None:
 def register_score_routes(app: Flask) -> None:
     @app.before_request
     def before_score_request() -> None:
-        init_scores_db()
+        init_schema_once("scores", init_scores_db)
 
     @app.get("/api/scores")
     def list_scores():

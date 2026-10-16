@@ -21,6 +21,16 @@ class StoreError(ValueError):
     pass
 
 
+def version_sort_key(version: str) -> tuple[tuple[int, int | str], ...]:
+    """Order versions naturally, so 1.10.0 sorts after 1.9.0."""
+    parts = re.split(r"[._+-]", str(version))
+    return tuple((0, int(part)) if part.isdigit() else (1, part) for part in parts)
+
+
+def latest_version(versions: Any) -> str:
+    return max(versions, key=version_sort_key)
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -107,18 +117,7 @@ class GameStore:
                 "versions": {},
             },
         )
-        game.update(
-            {
-                "title": metadata["title"],
-                "summary": metadata.get("summary", ""),
-                "authors": metadata.get("authors", []),
-                "tags": metadata.get("tags", []),
-                "latest_version": version,
-                "updated_at": now,
-            }
-        )
-        if publisher:
-            game["publisher"] = publisher
+        game["updated_at"] = now
         versions = game.setdefault("versions", {})
         version_rec = versions.setdefault(
             version,
@@ -153,6 +152,20 @@ class GameStore:
         if publisher:
             variant["published_by"] = publisher
         version_rec.setdefault("architectures", {})[architecture] = variant
+        # Re-publishing an older version must not move "latest" backwards,
+        # nor replace the catalog title/summary with the older metadata.
+        game["latest_version"] = latest_version(versions)
+        if game["latest_version"] == version:
+            game.update(
+                {
+                    "title": metadata["title"],
+                    "summary": metadata.get("summary", ""),
+                    "authors": metadata.get("authors", []),
+                    "tags": metadata.get("tags", []),
+                }
+            )
+            if publisher:
+                game["publisher"] = publisher
         self.save_index(index)
         return self.public_game(game_id, version=version)
 
@@ -197,9 +210,10 @@ class GameStore:
         metadata["tags"] = tags
         version_rec["metadata"] = metadata
         version_rec["updated_at"] = utc_now()
-        game["title"] = metadata["title"]
-        game["summary"] = metadata["summary"]
-        game["tags"] = tags
+        if game.get("latest_version") == version:
+            game["title"] = metadata["title"]
+            game["summary"] = metadata["summary"]
+            game["tags"] = tags
         game["updated_at"] = utc_now()
         self.save_index(index)
         return self.public_game(game_id, version=version)
@@ -232,7 +246,7 @@ class GameStore:
             games.pop(game_id, None)
         else:
             if game.get("latest_version") == version:
-                game["latest_version"] = sorted(versions)[-1]
+                game["latest_version"] = latest_version(versions)
             game["updated_at"] = utc_now()
         self.save_index(index)
 
@@ -259,7 +273,7 @@ class GameStore:
             "tags": game.get("tags", []),
             "latest_version": game.get("latest_version"),
             "selected_version": selected_version,
-            "versions": sorted(versions),
+            "versions": sorted(versions, key=version_sort_key),
             "architectures": sorted(architectures),
             "metadata": version_rec.get("metadata"),
             "colophon": version_rec.get("colophon"),

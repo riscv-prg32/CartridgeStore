@@ -63,7 +63,7 @@ def test_mdns_registers_prg32_service(tmp_path, monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "zeroconf", fake_module)
     monkeypatch.setattr("cartridge_store.mdns._local_addresses", lambda: [b"\x7f\x00\x00\x01"])
     monkeypatch.setattr("cartridge_store.mdns._local_hostname", lambda: "host.local.")
-    app = create_app({"TESTING": False, "DATA_DIR": str(tmp_path / "data")})
+    app = create_app({"TESTING": False, "SECRET_KEY": "mdns-test", "DATA_DIR": str(tmp_path / "data")})
 
     assert registered["service_type"] == "_prg32store._tcp.local."
     assert registered["name"] == "PRG32 Cartridge Store._prg32store._tcp.local."

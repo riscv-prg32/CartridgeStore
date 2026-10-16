@@ -5,9 +5,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from flask import Flask
+from flask import Flask, current_app
 
-from .database import get_db
+from .database import get_db, init_schema_once
 
 
 SETTINGS_SCHEMA = """
@@ -59,7 +59,8 @@ DEFAULT_SETTINGS = {
     "saml_idp_x509cert": "",
 }
 
-_theme_cache: tuple[float, dict[str, str]] | None = None
+# Keyed by database path so separate apps (and tests) never share themes.
+_theme_cache: dict[str, tuple[float, dict[str, str]]] = {}
 
 
 def init_settings_db() -> None:
@@ -77,7 +78,6 @@ def get_setting(key: str, default: Any = None) -> str:
 
 
 def set_setting(key: str, value: Any) -> None:
-    global _theme_cache
     get_db().execute(
         """
         INSERT INTO store_settings(key, value)
@@ -87,25 +87,26 @@ def set_setting(key: str, value: Any) -> None:
         (key, str(value)),
     )
     get_db().commit()
-    _theme_cache = None
+    _theme_cache.pop(str(current_app.config["DATABASE"]), None)
 
 
 def theme_context() -> dict[str, str]:
-    global _theme_cache
+    key = str(current_app.config["DATABASE"])
     now = time.monotonic()
-    if _theme_cache is not None and now - _theme_cache[0] < 60:
-        return dict(_theme_cache[1])
+    cached = _theme_cache.get(key)
+    if cached is not None and now - cached[0] < 60:
+        return dict(cached[1])
     values = {key: get_setting(key, default) for key, default in DEFAULT_SETTINGS.items()}
     values["color_primary"] = values["theme_primary_color"]
     values["color_secondary"] = values["theme_secondary_color"]
-    _theme_cache = (now, values)
+    _theme_cache[key] = (now, values)
     return dict(values)
 
 
 def register_settings(app: Flask) -> None:
     @app.before_request
     def before_settings_request() -> None:
-        init_settings_db()
+        init_schema_once("settings", init_settings_db)
 
     @app.context_processor
     def inject_theme() -> dict[str, str]:

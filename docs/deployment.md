@@ -10,6 +10,7 @@ storage mounted outside the container or process directory.
 | `SECRET_KEY` | required | Flask session signing key |
 | `PRG32_STORE_DATA` | `data` or `/data` in Docker | Cartridge files, custom static assets, and default DB location |
 | `PRG32_STORE_DB` | `<data>/cartridge_store.sqlite` | Unified SQLite database |
+| `PRG32_ADMIN_PASSWORD` | `password` | Initial password for the seeded `admin` account (used only while no admin exists) |
 | `PRG32_SCORE_DB` | unset | Legacy score DB fallback |
 | `PRG32_METRICS_DB` | unset | Legacy metrics DB fallback |
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |

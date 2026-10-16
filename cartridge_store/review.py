@@ -12,7 +12,7 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from . import prg32_format as fmt
 from .auth import Principal, current_principal, editor_required
-from .database import get_db
+from .database import get_db, init_schema_once
 from .store import GameStore, StoreError, safe_game_id, safe_version
 
 
@@ -338,7 +338,7 @@ def _publish_prepared(store: GameStore, prepared: list[dict[str, Any]]) -> None:
 def register_review_routes(app: Flask, store: GameStore) -> None:
     @app.before_request
     def before_review_request() -> None:
-        init_review_db()
+        init_schema_once("review", init_review_db)
 
     @app.get("/editor/submissions")
     @editor_required

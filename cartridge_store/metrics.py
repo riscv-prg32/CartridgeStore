@@ -10,7 +10,7 @@ from typing import Any
 from flask import Flask, Response, current_app, jsonify, request
 
 from .auth import current_principal
-from .database import add_column_if_missing, get_db
+from .database import add_column_if_missing, get_db, init_schema_once
 from .metrics_report import generate_markdown_report, list_runs, summarize_samples
 from .users import can_view_run, run_json_response
 
@@ -101,7 +101,7 @@ def _samples_for_run(run_id: str) -> list[dict[str, Any]]:
 def register_metrics_routes(app: Flask) -> None:
     @app.before_request
     def before_metrics_request() -> None:
-        init_metrics_db()
+        init_schema_once("metrics", init_metrics_db)
 
     @app.get("/api/metrics")
     def metrics_index():
@@ -144,6 +144,12 @@ def register_metrics_routes(app: Flask) -> None:
             "user_id": current_principal().id,
         }
 
+        existing = _row_dict(
+            get_db().execute("SELECT user_id FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        )
+        if existing and not can_view_run(existing):
+            return jsonify({"ok": False, "error": "run_id belongs to another user"}), 403
+
         get_db().execute(
             """
             INSERT INTO runs(
@@ -165,8 +171,9 @@ def register_metrics_routes(app: Flask) -> None:
                 game_name = excluded.game_name,
                 sample_period_frames = excluded.sample_period_frames,
                 started_at = excluded.started_at,
-                submitted_by = excluded.submitted_by,
-                user_id = excluded.user_id
+                submitted_by = CASE WHEN runs.user_id IS NULL
+                                    THEN excluded.submitted_by ELSE runs.submitted_by END,
+                user_id = COALESCE(runs.user_id, excluded.user_id)
             """,
             record,
         )
@@ -182,9 +189,13 @@ def register_metrics_routes(app: Flask) -> None:
             return jsonify({"ok": False, "error": "expected run_id and samples"}), 400
 
         db = get_db()
-        run = db.execute("SELECT run_id FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        run = _row_dict(
+            db.execute("SELECT run_id, user_id FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        )
         if not run:
             return jsonify({"ok": False, "error": "run_id not found"}), 404
+        if not can_view_run(run):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
 
         inserted = 0
         for raw_sample in samples:
@@ -238,6 +249,9 @@ def register_metrics_routes(app: Flask) -> None:
         finished_at = _int_value(data, "finished_ms", int(time.time() * 1000), 0)
         dropped = _int_value(data, "dropped_samples", 0, 0)
         db = get_db()
+        run = _row_dict(db.execute("SELECT user_id FROM runs WHERE run_id = ?", (run_id,)).fetchone())
+        if run and not can_view_run(run):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
         cursor = db.execute(
             """
             UPDATE runs
@@ -253,7 +267,8 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs")
     def runs():
-        return jsonify(list_runs(current_app.config["DATABASE"]))
+        runs = list_runs(current_app.config["DATABASE"])
+        return jsonify([run for run in runs if can_view_run(run)])
 
     @app.get("/api/runs/<run_id>")
     def run_detail(run_id: str):
@@ -271,8 +286,11 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs/<run_id>/samples.csv")
     def samples_csv(run_id: str):
-        if not get_db().execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone():
+        run = _row_dict(get_db().execute("SELECT user_id FROM runs WHERE run_id = ?", (run_id,)).fetchone())
+        if not run:
             return jsonify({"ok": False, "error": "run_id not found"}), 404
+        if not can_view_run(run):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
         samples = _samples_for_run(run_id)
         output = io.StringIO()
         fields = [
@@ -296,6 +314,9 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.get("/api/runs/<run_id>/report.md")
     def report_md(run_id: str):
+        run = _row_dict(get_db().execute("SELECT user_id FROM runs WHERE run_id = ?", (run_id,)).fetchone())
+        if run and not can_view_run(run):
+            return Response("Forbidden.\n", status=403, mimetype="text/markdown")
         text = generate_markdown_report(current_app.config["DATABASE"], run_id)
         status = 200 if "was not found" not in text else 404
         return Response(text, status=status, mimetype="text/markdown")

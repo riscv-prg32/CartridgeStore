@@ -42,7 +42,7 @@ from .auth import (
     register_auth_routes,
     set_user_groups,
 )
-from .database import close_db, get_db
+from .database import close_db, get_db, reset_schema_cache
 from .mdns import register_mdns
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
@@ -139,6 +139,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         STORE_VERSION="1.0.0",
         USERS=None,
         SECRET_KEY=secret_key,
+        SESSION_COOKIE_SAMESITE="Lax",
     )
     if test_config:
         app.config.update(test_config)
@@ -169,6 +170,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if request.path.startswith("/api/"):
             return jsonify({"ok": False, "error": str(exc)}), 400
         return render_template("error.html", error=str(exc)), 400
+
+    @app.errorhandler(sqlite3.IntegrityError)
+    def handle_integrity_error(exc: sqlite3.IntegrityError):
+        get_db().rollback()
+        message = "a record with the same name or email already exists"
+        if request.path.startswith("/api/") or request.method != "GET":
+            return jsonify({"ok": False, "error": message}), 400
+        return render_template("error.html", error=message), 400
 
     @app.errorhandler(413)
     def handle_too_large(exc: Exception):
@@ -381,7 +390,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         name = request.form.get("name", "").strip().lower()
         if not name:
             return jsonify({"ok": False, "error": "group name is required"}), 400
-        get_db().execute("UPDATE groups SET name = ? WHERE id = ?", (name, group_id))
+        get_db().execute(
+            "UPDATE groups SET name = ? WHERE id = ? AND name != 'editors'",
+            (name, group_id),
+        )
         get_db().commit()
         return redirect(url_for("admin_groups"))
 
@@ -450,12 +462,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @admin_required
     def admin_backup_download():
         archive = _create_backup_archive(store)
-        return send_file(
+        response = send_file(
             archive,
             mimetype="application/zip",
             as_attachment=True,
             download_name="prg32-cartridge-store-backup.zip",
         )
+        response.call_on_close(lambda: Path(archive).unlink(missing_ok=True))
+        return response
 
     @app.post("/admin/backup/restore")
     @admin_required
@@ -476,7 +490,11 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         port = os.environ.get("PRG32_STORE_PORT")
         host = request.host
         if port:
-            hostname = request.host.split(":", 1)[0]
+            hostname = request.host
+            if hostname.startswith("["):
+                hostname = hostname.split("]", 1)[0] + "]"
+            else:
+                hostname = hostname.split(":", 1)[0]
             host = f"{hostname}:{port}"
         scheme = request.scheme
         base = f"{scheme}://{host}"
@@ -648,16 +666,6 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     return app
 
 
-def read_upload(name: str, *, required: bool) -> bytes | None:
-    file = request.files.get(name)
-    if file is None or not file.filename:
-        if required:
-            raise StoreError(f"missing upload: {name}")
-        return None
-    data = file.read()
-    if required and not data:
-        raise StoreError(f"empty upload: {name}")
-    return data or None
 
 
 def _settings_form_values() -> dict[str, str]:
@@ -822,6 +830,7 @@ def _restore_backup_archive(store: GameStore, data: bytes) -> None:
                 else:
                     shutil.copy2(child, target)
         shutil.copy2(restored_db, db_path)
+    reset_schema_cache()
 
 
 def _extract_backup(archive: zipfile.ZipFile, destination: Path) -> None:
@@ -855,87 +864,14 @@ def _score_chart(scores: list[dict[str, Any]], color: str) -> str:
     )
 
 
-def parse_json_field(name: str) -> dict[str, Any] | None:
-    raw = request.form.get(name, "").strip()
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise StoreError(f"{name} must be valid JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise StoreError(f"{name} must be a JSON object")
-    return parsed
 
 
 def split_csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
-def metadata_from_form() -> dict[str, Any]:
-    metadata = parse_json_field("metadata")
-    if metadata is not None:
-        return metadata
-    author = request.form.get("author_name", "").strip()
-    authors = [{"name": author}] if author else []
-    if authors:
-        email = request.form.get("author_email", "").strip()
-        url = request.form.get("author_url", "").strip()
-        if email:
-            authors[0]["email"] = email
-        if url:
-            authors[0]["url"] = url
-    runtime: dict[str, Any] = {"platform": "PRG32", "isa": "RV32I"}
-    min_firmware = request.form.get("min_firmware", "").strip()
-    if min_firmware:
-        runtime["min_firmware"] = min_firmware
-    return {
-        "abi": fmt.METADATA_ABI,
-        "id": request.form.get("id", "").strip(),
-        "title": request.form.get("title", "").strip(),
-        "version": request.form.get("version", "").strip(),
-        "summary": request.form.get("summary", "").strip(),
-        "description": request.form.get("description", "").strip(),
-        "authors": authors,
-        "license": request.form.get("license", "").strip(),
-        "homepage": request.form.get("homepage", "").strip(),
-        "repository": request.form.get("repository", "").strip(),
-        "tags": split_csv(request.form.get("tags", "")),
-        "runtime": runtime,
-    }
 
 
-def colophon_from_form(metadata: dict[str, Any]) -> dict[str, Any]:
-    colophon = parse_json_field("colophon")
-    if colophon is not None:
-        return colophon
-    developer_name = request.form.get("developer_name", "").strip()
-    if not developer_name:
-        raise StoreError("developer_name is required when colophon JSON is not provided")
-    controls = []
-    for raw in split_csv(request.form.get("controls", "")):
-        if ":" in raw:
-            input_name, action = raw.split(":", 1)
-            controls.append({"input": input_name.strip(), "action": action.strip()})
-    return {
-        "abi": fmt.COLOPHON_ABI,
-        "title": request.form.get("colophon_title", "").strip() or metadata.get("title", ""),
-        "subtitle": request.form.get("subtitle", "").strip(),
-        "version": request.form.get("colophon_version", "").strip() or metadata.get("version", ""),
-        "release_date": request.form.get("release_date", "").strip(),
-        "developer": {
-            "name": developer_name,
-            "url": request.form.get("developer_url", "").strip(),
-        },
-        "authors": [],
-        "license": request.form.get("license", "").strip() or metadata.get("license", ""),
-        "copyright": request.form.get("copyright", "").strip(),
-        "acknowledgements": split_csv(request.form.get("acknowledgements", "")),
-        "dedication": request.form.get("dedication", "").strip(),
-        "content_notice": request.form.get("content_notice", "").strip(),
-        "controls": controls,
-        "start_prompt": request.form.get("start_prompt", "").strip() or "Press START to play",
-    }
 
 
 def publish_request(store: GameStore) -> dict[str, Any]:
@@ -944,34 +880,8 @@ def publish_request(store: GameStore) -> dict[str, Any]:
     raise StoreError("package upload required: upload a cartridge bundle (.zip)")
 
 
-def publish_legacy_form_request(store: GameStore) -> dict[str, Any]:
-    architecture = request.form.get("architecture", "esp32c6")
-    legacy = read_upload("cartridge", required=True)
-    icon = read_upload("icon", required=True)
-    screenshot = read_upload("screenshot", required=False)
-    signature = read_upload("signature", required=False)
-    metadata = metadata_from_form()
-    colophon = colophon_from_form(metadata)
-    image = fmt.build_cartridge(
-        legacy or b"",
-        metadata=metadata,
-        icon=icon or b"",
-        screenshot=screenshot,
-        signature=signature,
-        colophon=colophon,
-        architecture=architecture,
-    )
-    return publish_cartridge_image(store, image, architecture)
 
 
-def publish_cartridge_image(store: GameStore, image: bytes, architecture: str) -> dict[str, Any]:
-    parsed = fmt.parse_cartridge(image)
-    return store.publish(
-        image,
-        parsed,
-        architecture=fmt.normalize_architecture(architecture) or "esp32c6",
-        publisher=current_principal().name,
-    )
 
 
 def publish_bundle_request(store: GameStore) -> dict[str, Any]:
@@ -1013,6 +923,8 @@ def _prepare_bundle(zf: zipfile.ZipFile) -> list[dict[str, Any]]:
     if manifest.get("abi") != fmt.METADATA_ABI:
         raise StoreError(f"manifest.abi must be {fmt.METADATA_ABI}")
     fmt.validate_metadata(manifest)
+    safe_game_id(manifest["id"])
+    safe_version(manifest["version"])
     assets = manifest.get("assets")
     if not isinstance(assets, dict):
         raise StoreError("manifest.assets must be an object")
@@ -1125,32 +1037,6 @@ def _bundle_colophon(manifest: dict[str, Any]) -> dict[str, Any] | None:
     return colophon
 
 
-def _publish_prepared_bundle(store: GameStore, prepared: list[dict[str, Any]]) -> None:
-    index_existed = store.index_path.exists()
-    index_backup = store.index_path.read_bytes() if index_existed else b""
-    file_backups: dict[Path, bytes | None] = {}
-    try:
-        for item in prepared:
-            metadata = item["parsed"].metadata or {}
-            game_id = safe_game_id(metadata["id"])
-            version = safe_version(metadata["version"])
-            path = store.cartridge_dir / game_id / version / f"{item['architecture']}.prg32"
-            if path not in file_backups:
-                file_backups[path] = path.read_bytes() if path.exists() else None
-            publish_cartridge_image(store, item["image"], item["architecture"])
-    except Exception:
-        if index_existed:
-            store.index_path.write_bytes(index_backup)
-        elif store.index_path.exists():
-            store.index_path.unlink()
-        for path, data in file_backups.items():
-            if data is None:
-                if path.exists():
-                    path.unlink()
-            else:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
-        raise
 
 
 if __name__ == "__main__":
