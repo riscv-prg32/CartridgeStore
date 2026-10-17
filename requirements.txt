@@ -6,4 +6,4 @@ matplotlib>=3.7,<4
 pytest>=8,<10
 python3-saml>=1.16,<2
 simple-websocket>=1,<2
-zeroconf>=0.132,<1
+zeroconf>=0.151.5,<1
