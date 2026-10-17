@@ -92,3 +92,39 @@ docker compose up --build
 
 The image continues if `zeroconf` is absent, but mDNS advertisement is disabled
 with a startup warning.
+
+## Continuous Integration and Delivery
+
+GitHub Actions validates every pull request to `main` and every push to `main`:
+
+- compiles and tests the application on Python 3.11, 3.12, and 3.13;
+- audits Python dependencies for known vulnerabilities;
+- validates the Compose configuration;
+- builds the production image and starts it for a discovery-endpoint smoke test;
+- runs CodeQL analysis on pushes, pull requests, and a weekly schedule.
+
+After all CI jobs pass, trusted pushes publish multi-architecture `linux/amd64`
+and `linux/arm64` images to GitHub Container Registry. A push to `main` updates
+the `latest`, `edge`, and `sha-<commit>` tags. A tag such as `v1.2.3` publishes
+`1.2.3`, `1.2`, `1`, and `sha-<commit>`. Published images include GitHub build
+provenance attestations.
+
+The package name is derived from the repository and is available as:
+
+```text
+ghcr.io/riscv-prg32/cartridgestore
+```
+
+The repository's Actions settings must allow read/write workflow permissions
+so the built-in `GITHUB_TOKEN` can publish packages and attestations. Configure
+the `main` branch protection rule to require the Python matrix, dependency
+audit, container smoke test, and CodeQL checks before merging.
+
+Dependabot checks Python packages, the Docker base image, and workflow actions
+weekly. Creating a release only requires pushing a semantic-version tag after
+the corresponding commit has passed CI:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
