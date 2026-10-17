@@ -49,6 +49,7 @@ from .multiplayer import register_multiplayer_routes
 from .review import create_submission, register_review_routes
 from .scores import register_score_routes
 from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
+from . import sso
 from .stats import game_download_breakdown, record_download, register_stats_routes
 from .store import GameStore, StoreError, safe_game_id, safe_version
 from .users import register_user_routes
@@ -140,6 +141,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         USERS=None,
         SECRET_KEY=secret_key,
         SESSION_COOKIE_SAMESITE="Lax",
+        # Single sign-on and user sync with one PRG32-Construction-Kit (docs/accounts_and_sso.md).
+        SSO_SECRET=os.environ.get("PRG32_SSO_SECRET", ""),
+        SSO_PEER_URL=os.environ.get("PRG32_SSO_PEER_URL", ""),
+        SSO_TIMEOUT=float(os.environ.get("PRG32_SSO_TIMEOUT", "5")),
     )
     if test_config:
         app.config.update(test_config)
@@ -160,6 +165,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     register_stats_routes(app, store)
     register_user_routes(app)
     register_review_routes(app, store)
+    sso.register_sso_routes(app)
     register_mdns(app)
 
     @app.errorhandler(StoreError)
@@ -309,6 +315,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         )
         db.commit()
         _set_groups_from_form(int(cursor.lastrowid))
+        sso.user_changed(int(cursor.lastrowid))
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>")
@@ -326,6 +333,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if not username or not email:
             return jsonify({"ok": False, "error": "username and email are required"}), 400
         db = get_db()
+        previous = db.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
         db.execute(
             "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?",
             (username, email, role, user_id),
@@ -337,6 +345,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             )
         db.commit()
         _set_groups_from_form(user_id)
+        sso.user_changed(user_id, previous_email=str(previous["email"]) if previous else None)
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/role")
@@ -349,12 +358,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if role not in ROLE_LEVELS:
             return jsonify({"ok": False, "error": "unknown role"}), 400
         _set_user_role(user_id, role)
+        sso.user_changed(user_id)
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/groups")
     @admin_required
     def admin_user_groups(user_id: int):
         _set_groups_from_form(user_id)
+        sso.user_changed(user_id)
         return redirect(url_for("admin_users"))
 
     @app.delete("/admin/users/<int:user_id>")
@@ -509,6 +520,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "version": app.config["STORE_VERSION"],
                 "auth_enabled": auth_is_configured(),
                 "roles": list(ROLE_LEVELS),
+                "sso": {"enabled": sso.enabled(), "abi": sso.protocol.SSO_ABI},
                 "services": {
                     "cartridges": base + "/api/games",
                     "bundle_publish": base + "/api/publish/bundle",
@@ -558,6 +570,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "ok": True,
                 "auth_enabled": auth_is_configured(),
                 "user": current_principal().as_dict(),
+                "sso": {"enabled": sso.enabled(), "abi": sso.protocol.SSO_ABI},
             }
         )
 
@@ -728,8 +741,11 @@ def _set_user_role(user_id: int, role: str) -> None:
 
 
 def _delete_user(user_id: int) -> bool:
+    row = get_db().execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
     cursor = get_db().execute("DELETE FROM users WHERE id = ?", (user_id,))
     get_db().commit()
+    if row is not None:
+        sso.user_deleted(str(row["email"]))
     return cursor.rowcount > 0
 
 

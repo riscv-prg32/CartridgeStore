@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Opening Construction Kit - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="auth-panel">
+  {# The ticket travels in a POST body, not the address bar, and works only once. #}
+  <form method="post" action="{{ action }}" id="ssoForm">
+    <input type="hidden" name="ticket" value="{{ ticket }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <p>Opening the Construction Kit and signing you in&hellip;</p>
+    <button class="primary" type="submit">Continue</button>
+  </form>
+</section>
+<script>document.getElementById('ssoForm').submit();</script>
+{% endblock %}

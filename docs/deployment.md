@@ -28,6 +28,9 @@ storage mounted outside the container or process directory.
 | `PRG32_MDNS_NAME` | `PRG32 Cartridge Store` | mDNS instance name |
 | `PRG32_MDNS_TYPE` | `_prg32store._tcp.local.` | mDNS service type |
 | `PRG32_MDNS_PORT` | `5080` | mDNS advertised HTTP port |
+| `PRG32_SSO_SECRET` | unset | Shared secret (32+ characters) for user sync and single sign-on with a Construction Kit |
+| `PRG32_SSO_PEER_URL` | unset | The linked PRG32-Construction-Kit address, e.g. `http://kit.school.lan:5090` |
+| `PRG32_SSO_TIMEOUT` | `5` | Seconds to wait for the linked kit |
 | `PRG32_LDAP_URL` | unset | LDAP activation URL |
 | `PRG32_LDAP_BASE_DN` | unset | LDAP search base |
 | `PRG32_LDAP_BIND_DN` | unset | LDAP service account DN |

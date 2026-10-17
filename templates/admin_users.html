@@ -16,6 +16,12 @@
     </select>
     <button type="submit">Create User</button>
   </form>
+  {% if sso_enabled %}
+  <form method="post" action="/admin/sso/sync" class="inline-admin-form">
+    <span>Users are shared with the Construction Kit. Changes are sent right away; use this after the kit was offline or when turning sync on.</span>
+    <button type="submit">Sync now</button>
+  </form>
+  {% endif %}
   <table>
     <thead>
       <tr><th>Username</th><th>Email</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
