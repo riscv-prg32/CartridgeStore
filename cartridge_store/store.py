@@ -56,7 +56,10 @@ class GameStore:
         self.data_dir = Path(data_dir)
         self.cartridge_dir = self.data_dir / "cartridges"
         self.index_path = self.data_dir / "index.json"
-        self._publish_lock = Lock()
+        # Every catalog mutation is a read-modify-write of index.json.  Use one
+        # lock for all of them so an editor update or deletion cannot overwrite
+        # a concurrent publish (or each other) with a stale index snapshot.
+        self._mutation_lock = Lock()
         self.cartridge_dir.mkdir(parents=True, exist_ok=True)
 
     def _empty_index(self) -> dict[str, Any]:
@@ -92,7 +95,7 @@ class GameStore:
         architecture: str,
         publisher: str | None = None,
     ) -> dict[str, Any]:
-        with self._publish_lock:
+        with self._mutation_lock:
             return self._publish_locked(
                 image,
                 parsed,
@@ -211,6 +214,24 @@ class GameStore:
         summary: str,
         tags: list[str],
     ) -> dict[str, Any]:
+        with self._mutation_lock:
+            return self._update_metadata_locked(
+                game_id,
+                version,
+                title=title,
+                summary=summary,
+                tags=tags,
+            )
+
+    def _update_metadata_locked(
+        self,
+        game_id: str,
+        version: str,
+        *,
+        title: str,
+        summary: str,
+        tags: list[str],
+    ) -> dict[str, Any]:
         game_id = safe_game_id(game_id)
         version = safe_version(version)
         index = self.load_index()
@@ -237,6 +258,15 @@ class GameStore:
         return self.public_game(game_id, version=version)
 
     def delete_variant(self, game_id: str, version: str, architecture: str | None = None) -> None:
+        with self._mutation_lock:
+            self._delete_variant_locked(game_id, version, architecture)
+
+    def _delete_variant_locked(
+        self,
+        game_id: str,
+        version: str,
+        architecture: str | None = None,
+    ) -> None:
         game_id = safe_game_id(game_id)
         version = safe_version(version)
         index = self.load_index()

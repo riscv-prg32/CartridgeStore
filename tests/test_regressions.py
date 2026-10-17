@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
+
+import pytest
+
 from cartridge_store import create_app, prg32_format as fmt
 from cartridge_store.auth import upsert_external_user
 from cartridge_store.charts import _color
@@ -117,9 +122,14 @@ def test_version_ordering_is_natural() -> None:
     assert sorted(["1.10.0", "1.9.0", "1.2.0"], key=version_sort_key) == ["1.2.0", "1.9.0", "1.10.0"]
 
 
-def _publish(store: GameStore, version: str, title: str) -> None:
+def _publish(
+    store: GameStore,
+    version: str,
+    title: str,
+    game_id: str = "org.example.test",
+) -> None:
     meta = metadata()
-    meta.update({"version": version, "title": title})
+    meta.update({"id": game_id, "version": version, "title": title})
     image = fmt.build_cartridge(
         fake_cart(),
         metadata=meta,
@@ -141,6 +151,62 @@ def test_republishing_older_version_keeps_latest(tmp_path) -> None:
 
     store.delete_variant("org.example.test", "1.10.0")
     assert store.public_game("org.example.test")["latest_version"] == "1.9.0"
+
+
+def test_catalog_mutations_do_not_overwrite_each_other(tmp_path) -> None:
+    store = GameStore(tmp_path / "data")
+    _publish(store, "1.0.0", "Keep", "org.example.keep")
+    _publish(store, "1.0.0", "Delete", "org.example.delete")
+
+    update_is_saving = Event()
+    allow_update_to_finish = Event()
+    delete_started = Event()
+    original_save_index = store.save_index
+    save_calls_lock = Lock()
+    update_save_seen = False
+
+    def delayed_save(index) -> None:
+        nonlocal update_save_seen
+        should_wait = False
+        with save_calls_lock:
+            keep = index["games"]["org.example.keep"]
+            if keep["title"] == "Updated" and not update_save_seen:
+                update_save_seen = True
+                should_wait = True
+        if should_wait:
+            update_is_saving.set()
+            assert allow_update_to_finish.wait(timeout=2)
+        original_save_index(index)
+
+    store.save_index = delayed_save
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        update = executor.submit(
+            store.update_metadata,
+            "org.example.keep",
+            "1.0.0",
+            title="Updated",
+            summary="",
+            tags=[],
+        )
+        assert update_is_saving.wait(timeout=2)
+
+        def delete_game() -> None:
+            delete_started.set()
+            store.delete_variant("org.example.delete", "1.0.0")
+
+        delete = executor.submit(delete_game)
+        assert delete_started.wait(timeout=2)
+        with pytest.raises(TimeoutError):
+            delete.result(timeout=0.1)
+        allow_update_to_finish.set()
+        update.result(timeout=2)
+        delete.result(timeout=2)
+
+    assert store.public_game("org.example.keep")["title"] == "Updated"
+    assert "org.example.delete" not in {
+        game["id"] for game in store.list_games()
+    }
 
 
 def test_bundle_with_unsafe_id_is_rejected_at_submission(tmp_path) -> None:
