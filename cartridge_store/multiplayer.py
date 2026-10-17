@@ -70,7 +70,13 @@ class MultiplayerHub:
             principal=principal,
         )
 
-    def receive(self, peer: MultiplayerPeer, raw: str | bytes | dict[str, Any]) -> None:
+    def receive(
+        self,
+        peer: MultiplayerPeer,
+        raw: str | bytes | dict[str, Any] | None,
+    ) -> bool:
+        if raw is None:
+            return False
         if isinstance(raw, dict):
             message = raw
         else:
@@ -78,12 +84,12 @@ class MultiplayerHub:
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8")
                 message = json.loads(raw)
-            except (UnicodeDecodeError, json.JSONDecodeError):
+            except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
                 peer.send({"type": "error", "error": "invalid json"})
-                return
+                return True
             if not isinstance(message, dict):
                 peer.send({"type": "error", "error": "invalid json"})
-                return
+                return True
 
         message_type = message.get("type")
         if message_type == "join":
@@ -94,6 +100,7 @@ class MultiplayerHub:
             self.leave(peer)
         else:
             peer.send({"type": "error", "error": "unknown message type"})
+        return True
 
     def join(self, peer: MultiplayerPeer, message: dict[str, Any]) -> None:
         principal = self._authorize(peer, message)
@@ -324,6 +331,7 @@ def register_multiplayer_routes(app: Flask) -> None:
         )
         try:
             while True:
-                hub.receive(peer, ws.receive())
+                if not hub.receive(peer, ws.receive()):
+                    break
         finally:
             hub.leave(peer)

@@ -158,6 +158,23 @@ def test_score_api_round_trip(tmp_path) -> None:
     assert "42" in page.text
 
 
+def test_score_api_rejects_invalid_inputs_without_server_errors(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    assert client.get("/api/scores?limit=lots").status_code == 400
+    assert client.post("/api/scores", json=[]).status_code == 400
+    too_large = client.post(
+        "/api/scores",
+        json={"game": "pong", "player": "Ada", "score": 2**63},
+    )
+    assert too_large.status_code == 400
+    infinite = client.post(
+        "/api/scores",
+        json={"game": "pong", "player": "Ada", "score": float("inf")},
+    )
+    assert infinite.status_code == 400
+
+
 def test_metrics_api_round_trip_and_export(tmp_path) -> None:
     client = make_client(tmp_path)
 
@@ -219,6 +236,26 @@ def test_metrics_missing_run_is_rejected(tmp_path) -> None:
     assert response.status_code == 404
 
 
+def test_metrics_api_rejects_non_object_json_and_bounds_integers(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    assert client.post("/api/runs", json=[]).status_code == 400
+    assert client.post("/api/metrics/batch", json=[]).status_code == 400
+
+    run = client.post(
+        "/api/runs",
+        json={
+            "run_id": "bounded-run",
+            "board_id": "board-1",
+            "target": "esp32c6",
+            "started_ms": 2**80,
+        },
+    )
+    assert run.status_code == 200
+    detail = client.get("/api/runs/bounded-run").get_json()
+    assert detail["run"]["started_at"] == 2**63 - 1
+
+
 def test_multiplayer_hub_relays_same_signature() -> None:
     hub = MultiplayerHub(max_peers=4)
     first_messages = []
@@ -253,6 +290,15 @@ def test_multiplayer_hub_relays_same_signature() -> None:
         "input": 3,
         "frame": 42,
     }
+
+
+def test_multiplayer_hub_treats_none_as_disconnect() -> None:
+    hub = MultiplayerHub(max_peers=4)
+    messages = []
+    peer = hub.connect(messages.append)
+
+    assert hub.receive(peer, None) is False
+    assert messages == []
 
 
 def test_multiplayer_hub_cleans_stale_peer_on_broadcast() -> None:

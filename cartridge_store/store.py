@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+from threading import Lock
 from typing import Any
 
 from . import prg32_format as fmt
@@ -55,6 +56,7 @@ class GameStore:
         self.data_dir = Path(data_dir)
         self.cartridge_dir = self.data_dir / "cartridges"
         self.index_path = self.data_dir / "index.json"
+        self._publish_lock = Lock()
         self.cartridge_dir.mkdir(parents=True, exist_ok=True)
 
     def _empty_index(self) -> dict[str, Any]:
@@ -83,6 +85,22 @@ class GameStore:
         tmp.replace(self.index_path)
 
     def publish(
+        self,
+        image: bytes,
+        parsed: fmt.CartridgeImage,
+        *,
+        architecture: str,
+        publisher: str | None = None,
+    ) -> dict[str, Any]:
+        with self._publish_lock:
+            return self._publish_locked(
+                image,
+                parsed,
+                architecture=architecture,
+                publisher=publisher,
+            )
+
+    def _publish_locked(
         self,
         image: bytes,
         parsed: fmt.CartridgeImage,

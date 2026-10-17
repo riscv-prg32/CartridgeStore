@@ -55,6 +55,8 @@ CREATE INDEX IF NOT EXISTS samples_run_frame_idx ON samples(run_id, frame);
 CREATE INDEX IF NOT EXISTS samples_run_frame_time_idx ON samples(run_id, frame_us);
 """
 
+SQLITE_INTEGER_MAX = 2**63 - 1
+
 
 def init_metrics_db() -> None:
     db = get_db()
@@ -71,12 +73,22 @@ def _clean_text(data: dict[str, Any], key: str, max_len: int, default: str = "")
     return str(value).strip()[:max_len]
 
 
-def _int_value(data: dict[str, Any], key: str, default: int = 0, minimum: int = 0) -> int:
+def _int_value(
+    data: dict[str, Any],
+    key: str,
+    default: int = 0,
+    minimum: int = 0,
+) -> int:
     try:
         value = int(data.get(key, default))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         value = default
-    return max(value, minimum)
+    return min(max(value, minimum), SQLITE_INTEGER_MAX)
+
+
+def _json_object() -> dict[str, Any] | None:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
 
 
 def _row_dict(row: Any | None) -> dict[str, Any] | None:
@@ -123,7 +135,9 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.post("/api/runs")
     def create_run():
-        data = request.get_json(silent=True) or {}
+        data = _json_object()
+        if data is None:
+            return jsonify({"ok": False, "error": "expected a JSON object"}), 400
         run_id = _clean_text(data, "run_id", 96)
         board_id = _clean_text(data, "board_id", 40)
         target = _clean_text(data, "target", 24)
@@ -182,7 +196,9 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.post("/api/metrics/batch")
     def create_batch():
-        data = request.get_json(silent=True) or {}
+        data = _json_object()
+        if data is None:
+            return jsonify({"ok": False, "error": "expected a JSON object"}), 400
         run_id = _clean_text(data, "run_id", 96)
         samples = data.get("samples")
         if not run_id or not isinstance(samples, list):
@@ -245,7 +261,9 @@ def register_metrics_routes(app: Flask) -> None:
 
     @app.post("/api/runs/<run_id>/finish")
     def finish_run(run_id: str):
-        data = request.get_json(silent=True) or {}
+        data = _json_object()
+        if data is None:
+            return jsonify({"ok": False, "error": "expected a JSON object"}), 400
         finished_at = _int_value(data, "finished_ms", int(time.time() * 1000), 0)
         dropped = _int_value(data, "dropped_samples", 0, 0)
         db = get_db()

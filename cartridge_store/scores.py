@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
 from .auth import current_principal, login_required
 from .database import add_column_if_missing, get_db, init_schema_once
+
+
+SQLITE_INTEGER_MAX = 2**63 - 1
+
+
+def _json_object() -> dict[str, Any] | None:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
 
 
 def init_scores_db() -> None:
@@ -41,7 +50,11 @@ def register_score_routes(app: Flask) -> None:
     def list_scores():
         game = request.args.get("game")
         player = request.args.get("player")
-        limit = min(max(request.args.get("limit", default=20, type=int), 1), 100)
+        try:
+            limit = int(request.args.get("limit", "20"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "limit must be an integer"}), 400
+        limit = min(max(limit, 1), 100)
         db = get_db()
         where = []
         params: list[object] = []
@@ -100,15 +113,17 @@ def register_score_routes(app: Flask) -> None:
     @app.post("/api/scores")
     @login_required
     def submit_score():
-        data = request.get_json(silent=True) or {}
+        data = _json_object()
+        if data is None:
+            return jsonify({"ok": False, "error": "expected a JSON object"}), 400
         game = str(data.get("game", "")).strip()[:24]
         player = str(data.get("player", "")).strip()[:24]
         try:
             score = int(data.get("score"))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             score = -1
 
-        if not game or not player or score < 0:
+        if not game or not player or score < 0 or score > SQLITE_INTEGER_MAX:
             return jsonify({"ok": False, "error": "expected game, player, score"}), 400
 
         db = get_db()

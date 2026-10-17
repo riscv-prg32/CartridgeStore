@@ -3,10 +3,13 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from cartridge_store import create_app
+from cartridge_store import prg32_format as fmt
+from cartridge_store.store import GameStore
 from tests.test_prg32_format import PNG_1X1, fake_cart, colophon, metadata
 
 
@@ -305,6 +308,32 @@ def test_publish_requires_login(tmp_path) -> None:
     )
 
     assert response.status_code == 401
+
+
+def test_concurrent_publishes_do_not_lose_catalog_entries(tmp_path) -> None:
+    store = GameStore(tmp_path / "data")
+
+    def publish(architecture: str) -> None:
+        image = fmt.build_cartridge(
+            fake_cart(),
+            metadata=metadata(),
+            icon=PNG_1X1,
+            colophon=colophon(),
+            architecture=architecture,
+        )
+        store.publish(
+            image,
+            fmt.parse_cartridge(image),
+            architecture=architecture,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        list(executor.map(publish, ["esp32c6", "qemu"]))
+
+    assert store.public_game("org.example.test")["architectures"] == [
+        "esp32c6",
+        "qemu",
+    ]
 
 
 def test_discovery_document(client) -> None:
