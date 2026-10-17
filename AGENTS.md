@@ -74,6 +74,13 @@ Do not break existing firmware/tool clients:
 When changing response shapes, preserve old fields and add new optional fields
 instead of replacing existing ones.
 
+## Single Sign-On
+
+- `cartridge_store/sso_protocol.py` must stay identical to
+  `prg32_construction_kit/sso_protocol.py` in PRG32-Construction-Kit.
+- Every code path that creates, changes or deletes a user must call
+  `sso.user_changed()` or `sso.user_deleted()` so a linked kit stays in sync.
+
 ## Storage Rules
 
 - `PRG32_STORE_DATA` controls filesystem cartridge storage and the default

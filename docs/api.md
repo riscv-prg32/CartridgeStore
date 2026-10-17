@@ -84,6 +84,24 @@ OIDC and SAML2 can be enabled from `/setup` or environment variables. On a
 successful federated login, the service creates or updates a local user with
 the external provider id and email address.
 
+## Single sign-on with PRG32-Construction-Kit
+
+Only when `PRG32_SSO_SECRET` and `PRG32_SSO_PEER_URL` are set; see
+[accounts_and_sso.md](accounts_and_sso.md).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/api/sso/users` | Signed requests from the linked kit: list / apply user records |
+| `POST` | `/admin/sso/sync` | Admin: send waiting changes, then merge all users both ways |
+| `GET` | `/auth/sso/peer?next=/path` | Open the linked kit already signed in |
+| `POST` | `/auth/sso/accept` | Receives a one-time login ticket from the kit |
+
+`POST /api/publish` and `POST /api/publish/bundle` also accept a one-time
+API ticket from the linked kit as the Bearer token (`Bearer sso1....`); the
+cartridge is published as the user named in the ticket. `/api/me` and
+`/.well-known/prg32-store.json` gain an optional `sso` field:
+`{"enabled": true, "abi": "prg32-sso-1.0"}`.
+
 ## Administration
 
 | Method | Path | Purpose |

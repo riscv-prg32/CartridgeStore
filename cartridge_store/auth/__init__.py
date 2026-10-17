@@ -30,7 +30,7 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash
 
-from ..database import get_db, init_schema_once
+from ..database import add_column_if_missing, get_db, init_schema_once
 
 
 ROLE_LEVELS = {
@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
     external_id       TEXT,
     external_provider TEXT,
     created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT,
     last_login        TEXT
 );
 
@@ -240,6 +241,8 @@ def token_hash(token: str) -> str:
 def init_auth_db() -> None:
     db = get_db()
     db.executescript(AUTH_SCHEMA)
+    # Changed whenever an account changes; user sync with a Construction Kit keeps the newest.
+    add_column_if_missing(db, "users", "updated_at", "TEXT")
     db.execute("INSERT OR IGNORE INTO groups(name) VALUES ('editors')")
     db.commit()
     ensure_default_admin()
@@ -400,7 +403,9 @@ def upsert_external_user(
             (_unique_username(username, email), email, role, provider, external_id),
         )
         db.commit()
+        _sync_user(int(cursor.lastrowid))
         return int(cursor.lastrowid)
+    previous = db.execute("SELECT email FROM users WHERE id = ?", (int(row["id"]),)).fetchone()
     db.execute(
         """
         UPDATE users
@@ -410,7 +415,15 @@ def upsert_external_user(
         (email, provider, external_id, int(row["id"])),
     )
     db.commit()
+    _sync_user(int(row["id"]), previous_email=str(previous["email"]) if previous else None)
     return int(row["id"])
+
+
+def _sync_user(user_id: int, previous_email: str | None = None) -> None:
+    """Tell a synced Construction Kit (if any) that this user changed."""
+    from ..sso import user_changed
+
+    user_changed(user_id, previous_email=previous_email)
 
 
 def _unique_username(preferred: str, email: str) -> str:
@@ -427,6 +440,16 @@ def _unique_username(preferred: str, email: str) -> str:
 def authenticate_token(token: str, users: Iterable[Principal] | None = None) -> Principal:
     if not token:
         return ANONYMOUS
+
+    if has_app_context() and token.startswith("sso1."):
+        # A one-time ticket from the synced Construction Kit, publishing as one of our users.
+        from ..sso import use_ticket
+
+        email = use_ticket(token, "api")
+        if email is None:
+            return ANONYMOUS
+        row = get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        return principal_from_row(row)
 
     if has_app_context():
         row = get_db().execute(
@@ -795,6 +818,7 @@ def register_auth_routes(app: Flask) -> None:
         if role == "admin":
             add_user_to_group(user_id, "editors")
         _mark_registration_token_used(int(record["id"]))
+        _sync_user(user_id)
         session.clear()
         session["user_id"] = user_id
         session["role"] = role

@@ -229,6 +229,8 @@ Operate and deploy the Store:
 
 Integrate with clients and tools:
 
+- [Accounts and single sign-on](docs/accounts_and_sso.md): sharing users
+  with a PRG32-Construction-Kit.
 - [Unified service API](docs/api.md): discovery document, auth endpoints,
   admin endpoints, cartridge package format, editor verification API, scores,
   metrics, statistics, multiplayer, and compatibility notes.
