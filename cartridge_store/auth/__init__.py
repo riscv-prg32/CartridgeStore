@@ -815,6 +815,9 @@ def register_auth_routes(app: Flask) -> None:
             request.form["password"],
             role=role,
         )
+        from ..privacy import mark_privacy_notice_delivered
+
+        mark_privacy_notice_delivered(user_id)
         if role == "admin":
             add_user_to_group(user_id, "editors")
         _mark_registration_token_used(int(record["id"]))

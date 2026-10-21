@@ -34,6 +34,7 @@ def init_scores_db() -> None:
         """
     )
     add_column_if_missing(db, "scores", "submitted_by", "TEXT NOT NULL DEFAULT ''")
+    add_column_if_missing(db, "scores", "user_id", "INTEGER REFERENCES users(id)")
     db.execute(
         "CREATE INDEX IF NOT EXISTS scores_game_score_idx "
         "ON scores(game, score DESC, created_at ASC)"
@@ -129,10 +130,17 @@ def register_score_routes(app: Flask) -> None:
         db = get_db()
         db.execute(
             """
-            INSERT INTO scores(game, player, score, created_at, submitted_by)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO scores(game, player, score, created_at, submitted_by, user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (game, player, score, int(time.time()), current_principal().name),
+            (
+                game,
+                player,
+                score,
+                int(time.time()),
+                current_principal().name,
+                current_principal().id,
+            ),
         )
         db.commit()
         return jsonify({"ok": True})

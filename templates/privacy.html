@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Notice - {{ store_name }}{% endblock %}
+
+{% block content %}
+<article class="privacy-notice">
+  <h1>Privacy notice</h1>
+  <p><strong>Version:</strong> {{ privacy.notice_version }}</p>
+  {% if not privacy.controller_name or not privacy.privacy_contact_email %}
+  <div class="flash"><p>This installation has not completed its controller contact details. The administrator must complete the Privacy and GDPR section in Setup before production use.</p></div>
+  {% endif %}
+
+  <h2>Controller and contact</h2>
+  <p>The controller is <strong>{{ privacy.controller_name or "not configured" }}</strong>{% if privacy.controller_address %}, {{ privacy.controller_address }}{% endif %}.
+    Privacy contact: {% if privacy.privacy_contact_email %}<a href="mailto:{{ privacy.privacy_contact_email }}">{{ privacy.privacy_contact_email }}</a>{% else %}not configured{% endif %}.
+    {% if privacy.dpo_email %}Data Protection Officer: <a href="mailto:{{ privacy.dpo_email }}">{{ privacy.dpo_email }}</a>.{% endif %}</p>
+
+  <h2>Data, purposes, and lawful bases</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Purpose</th><th>Typical lawful basis</th><th>Retention</th></tr></thead>
+    <tbody>
+      <tr><td>Username, email, password hash, roles, groups, login dates and access tokens</td><td>Provide and secure accounts; authorize publishing and administration</td><td>Contract or steps before a contract; public task for qualifying educational institutions; legitimate interests for security</td><td>Account lifetime, then erased on a valid request unless law requires retention</td></tr>
+      <tr><td>Registration email and verification token</td><td>Verify ownership and prevent account abuse</td><td>Steps requested before account creation; legitimate interests for security</td><td>{{ privacy.registration_retention_days }} days</td></tr>
+      <tr><td>Cartridge submissions, reviewer identity, scores and player names</td><td>Publish classroom work, moderate content, and operate leaderboards</td><td>Contract, public task, or legitimate interests selected by the controller</td><td>While the service needs the shared record; account identifiers are anonymised on erasure</td></tr>
+      <tr><td>Performance runs and samples</td><td>Measure and teach software performance</td><td>Contract, public task, or legitimate interests selected by the controller</td><td>{{ privacy.metrics_retention_days }} days</td></tr>
+      <tr><td>Pseudonymous IP hash, user agent and download activity</td><td>Security and aggregate usage statistics</td><td>Legitimate interests, subject to the controller's balancing test</td><td>{{ privacy.download_retention_days }} days</td></tr>
+      <tr><td>Essential signed session cookie</td><td>Keep authenticated users signed in</td><td>Strictly necessary to provide the requested service</td><td>Browser session</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Recipients, transfers, and sources</h2>
+  <p>Administrators and authorised editors can access data required for their roles. The Store does not include advertising or non-essential tracking cookies. Hosting, email, identity-provider, proxy, backup, and support providers configured by the operator may process data as processors or independent controllers. The operator must list those recipients and document any transfer outside the EEA, its legal mechanism, and safeguards in its deployment record.</p>
+  <p>Most data comes directly from you or your PRG32 client. Identity data can also come from a configured LDAP, OpenID Connect, SAML, or linked Construction Kit service.</p>
+
+  <h2>Your rights</h2>
+  <p>Subject to the conditions and exceptions in applicable law, you may request access, rectification, erasure, restriction, portability, or object to processing. The service does not make decisions producing legal or similarly significant effects solely by automated means. Signed-in users can download a machine-readable copy or erase their account from the Privacy page. Contact the controller for other requests; it must normally respond within one month and may verify identity.</p>
+  {% if privacy.supervisory_authority %}<p>You may complain to {% if privacy.supervisory_authority_url %}<a href="{{ privacy.supervisory_authority_url }}" rel="noopener">{{ privacy.supervisory_authority }}</a>{% else %}{{ privacy.supervisory_authority }}{% endif %} or another competent supervisory authority.</p>{% endif %}
+
+  <h2>Security and changes</h2>
+  <p>The Store uses role-based access, hashed passwords and access tokens, signed HttpOnly SameSite cookies, retention deletion, data export, and account erasure controls. The operator remains responsible for HTTPS, access reviews, encrypted backups, incident response, processor agreements, records of processing, and any required impact assessment. Material notice changes use a new version date.</p>
+</article>
+{% endblock %}

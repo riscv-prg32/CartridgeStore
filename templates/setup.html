@@ -52,6 +52,23 @@
   </section>
 
   <section>
+    <h2>Privacy and GDPR</h2>
+    <p>Complete these fields before opening the service to users. Retention is enforced daily and can also be run from the operations endpoint.</p>
+    <div class="field-grid">
+      <label>Data Controller<input name="privacy_controller_name" value="{{ settings.privacy_controller_name }}" required></label>
+      <label>Controller Address<input name="privacy_controller_address" value="{{ settings.privacy_controller_address }}"></label>
+      <label>Privacy Contact Email<input name="privacy_contact_email" type="email" value="{{ settings.privacy_contact_email }}" required></label>
+      <label>DPO Email, if appointed<input name="privacy_dpo_email" type="email" value="{{ settings.privacy_dpo_email }}"></label>
+      <label>Supervisory Authority<input name="privacy_supervisory_authority" value="{{ settings.privacy_supervisory_authority }}"></label>
+      <label>Authority URL<input name="privacy_supervisory_authority_url" type="url" value="{{ settings.privacy_supervisory_authority_url }}"></label>
+      <label>Download telemetry retention (days)<input name="privacy_download_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_download_retention_days }}"></label>
+      <label>Metrics retention (days)<input name="privacy_metrics_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_metrics_retention_days }}"></label>
+      <label>Unused registration data retention (days)<input name="privacy_registration_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_registration_retention_days }}"></label>
+    </div>
+    <p><a href="/privacy" target="_blank" rel="noopener">Preview privacy notice</a></p>
+  </section>
+
+  <section>
     <h2>Publish</h2>
     <label class="check-row"><input name="publish_require_auth" type="checkbox" value="true" {% if settings.publish_require_auth == "true" %}checked{% endif %}> Require auth to publish</label>
     <div class="field-grid">

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section>
+  <h1>Your privacy controls</h1>
+  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+  <p>Read the current <a href="/privacy">privacy notice</a> or download a structured JSON copy of the personal data linked to your account.</p>
+  <p><a class="button" href="/api/me/export">Download my data</a></p>
+</section>
+<section>
+  <h2>Erase account</h2>
+  <p>This removes your account, tokens, owned metrics runs and download records. Shared classroom records such as scores and reviewed submissions are anonymised. Legal exceptions may require the controller to handle a request manually. The last administrator must first appoint another administrator.</p>
+  <form method="post" action="/account/delete">
+    <label>Type DELETE to confirm<input name="confirmation" autocomplete="off" required></label>
+    <button class="danger" type="submit">Erase my account</button>
+  </form>
+</section>
+{% endblock %}

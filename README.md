@@ -3,6 +3,27 @@
 An installable Flask/PWA catalog and classroom service hub for PRG32 `.prg32`
 game cartridges.
 
+![Cartridge Store privacy architecture](docs/images/privacy-architecture.svg)
+
+## Hard Requirements
+
+- Preserve the public cartridge, score, metrics, multiplayer, and discovery
+  contracts documented below.
+- Run production deployments behind HTTPS with a high-entropy `SECRET_KEY`,
+  `PRG32_SECURE_COOKIES=true`, durable protected storage, tested backups, and a
+  changed bootstrap administrator password.
+- Treat GDPR compliance as a continuous controller obligation. Before admitting
+  users, complete the Privacy and GDPR setup, select and document lawful bases
+  and retention periods, publish the privacy notice, inventory processors and
+  transfers, and establish rights-request and breach procedures.
+- Reassess privacy and security whenever data, purposes, providers, audiences,
+  or applicable law change. Software controls support compliance but cannot by
+  themselves certify a deployment.
+
+See [GDPR and privacy operations](docs/gdpr.md) for the mandatory deployment
+checklist, data map, retention schedule, rights workflow, incident procedure,
+and authoritative EU sources.
+
 ## Quick Deploy With Docker
 
 ```bash
@@ -87,6 +108,7 @@ GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
 | --- | --- |
 | `GET` | `/api` |
 | `GET` | `/api/me` |
+| `GET` | `/api/me/export` |
 | `GET` | `/api/games` |
 | `GET` | `/api/games/<id>` |
 | `GET` | `/api/games/<id>/icon` |
@@ -195,6 +217,10 @@ change the per-signature room limit.
   starts a new play.
 - Score, metrics, and multiplayer APIs keep the legacy request and response
   contracts from the archived standalone servers.
+- The versioned `/privacy` notice, machine-readable personal-data export,
+  self-service account erasure, finite telemetry retention, and browser security
+  headers provide a privacy-by-design baseline.
+- The service uses no advertising or non-essential tracking cookies.
 
 ## Tests
 
@@ -226,6 +252,9 @@ Operate and deploy the Store:
 - [Operations](docs/operations.md): daily classroom operations, backup and
   restore, health checks, publishing workflow, user registration, admin pages,
   access-token rotation, logs, network checks, and full data reset.
+- [GDPR and privacy operations](docs/gdpr.md): hard production requirements,
+  data-flow architecture, controller duties, retention, data-subject rights,
+  security, incident response, and review sources.
 
 Integrate with clients and tools:
 

@@ -46,6 +46,7 @@ from .database import close_db, get_db, reset_schema_cache
 from .mdns import register_mdns
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
+from .privacy import register_privacy_routes
 from .review import create_submission, register_review_routes
 from .scores import register_score_routes
 from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
@@ -141,6 +142,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         USERS=None,
         SECRET_KEY=secret_key,
         SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SECURE=os.environ.get("PRG32_SECURE_COOKIES", "false").lower() == "true",
         # Single sign-on and user sync with one PRG32-Construction-Kit (docs/accounts_and_sso.md).
         SSO_SECRET=os.environ.get("PRG32_SSO_SECRET", ""),
         SSO_PEER_URL=os.environ.get("PRG32_SSO_PEER_URL", ""),
@@ -165,6 +168,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     register_stats_routes(app, store)
     register_user_routes(app)
     register_review_routes(app, store)
+    register_privacy_routes(app)
     sso.register_sso_routes(app)
     register_mdns(app)
 

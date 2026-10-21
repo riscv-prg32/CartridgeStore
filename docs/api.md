@@ -30,6 +30,11 @@ email address.
 | `GET/POST` | `/auth/register/complete` | Complete registration from the emailed link |
 | `GET/POST` | `/auth/login` | Authenticate and set the session cookie |
 | `POST` | `/auth/logout` | Clear the session |
+| `GET` | `/privacy` | Versioned public privacy notice |
+| `GET` | `/account/privacy` | Signed-in user's privacy dashboard |
+| `GET` | `/api/me/export` | Machine-readable personal-data export |
+| `POST` | `/account/delete` | Erase the signed-in account after `confirmation=DELETE` |
+| `POST` | `/admin/privacy/cleanup` | Run configured retention cleanup (administrator) |
 | `GET` | `/auth/me` | Current user JSON |
 | `GET` | `/auth/tokens` | List your Bearer tokens or open the token manager |
 | `POST` | `/auth/tokens` | Create a Bearer token |

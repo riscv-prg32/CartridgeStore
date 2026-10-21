@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+import hmac
 import re
 import time
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, current_app, jsonify, render_template, request
 
 from . import charts
 from .auth import current_principal
@@ -46,7 +47,13 @@ def init_stats_db() -> None:
 
 
 def _hash_ip(remote_addr: str | None) -> str:
-    return hashlib.sha256(str(remote_addr or "").encode("utf-8")).hexdigest()
+    # Keyed pseudonymisation prevents cheap reversal of the small IPv4 address
+    # space while still allowing short-lived aggregate telemetry.
+    return hmac.new(
+        str(current_app.config["SECRET_KEY"]).encode("utf-8"),
+        str(remote_addr or "").encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def record_download(game_id: str, version: str, architecture: str) -> None:

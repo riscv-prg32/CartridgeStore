@@ -51,6 +51,7 @@
       {% if current_user.authenticated %}
       {% if sso_enabled %}<a href="/auth/sso/peer" title="Open the Construction Kit already signed in">Construction Kit</a>{% endif %}
       <a href="/auth/tokens">Tokens</a>
+      <a href="/account/privacy">Privacy</a>
       <span class="nav-user">{{ current_user.username }}</span>
       <form method="post" action="/auth/logout" class="nav-form"><button type="submit">Logout</button></form>
       {% else %}
@@ -70,6 +71,11 @@
   <main class="{% block main_class %}shell{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+
+  <footer class="site-footer">
+    <a href="/privacy">Privacy notice</a>
+    {% if store_contact_email %}<a href="mailto:{{ store_contact_email }}">Contact</a>{% endif %}
+  </footer>
 
   <script src="/static/app.js" defer></script>
   {% block scripts %}{% endblock %}

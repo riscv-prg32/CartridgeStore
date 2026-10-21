@@ -1,5 +1,23 @@
 # Operations
 
+## Privacy Operations
+
+Before admitting users, complete the Privacy and GDPR section at `/setup` and
+the hard checklist in [GDPR and privacy operations](gdpr.md). Review the public
+notice at `/privacy` from a logged-out browser. Test a non-admin account's JSON
+export and erasure flow at `/account/privacy`.
+
+Retention cleanup runs daily with normal traffic. Run and observe it manually
+after changing retention settings:
+
+```bash
+curl -X POST -b cookies.txt http://127.0.0.1:5080/admin/privacy/cleanup
+```
+
+The response lists deleted download events, metrics runs, and incomplete
+registration records. Separately expire proxy/SMTP/IdP logs, exports, and
+backups; they are outside Cartridge Store's database cleanup.
+
 This page collects day-to-day operational notes for running PRG32 Cartridge
 Store in a lab or classroom.
 

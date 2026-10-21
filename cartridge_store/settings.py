@@ -57,6 +57,15 @@ DEFAULT_SETTINGS = {
     "saml_idp_sso_url": "",
     "saml_idp_slo_url": "",
     "saml_idp_x509cert": "",
+    "privacy_controller_name": "",
+    "privacy_controller_address": "",
+    "privacy_contact_email": "",
+    "privacy_dpo_email": "",
+    "privacy_supervisory_authority": "",
+    "privacy_supervisory_authority_url": "",
+    "privacy_download_retention_days": "90",
+    "privacy_metrics_retention_days": "365",
+    "privacy_registration_retention_days": "7",
 }
 
 # Keyed by database path so separate apps (and tests) never share themes.

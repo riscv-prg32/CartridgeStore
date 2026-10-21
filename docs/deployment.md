@@ -50,6 +50,7 @@ storage mounted outside the container or process directory.
 | `PRG32_SAML_IDP_SSO_URL` | unset | SAML identity-provider SSO URL |
 | `PRG32_SAML_IDP_SLO_URL` | unset | SAML identity-provider logout URL |
 | `PRG32_SAML_IDP_X509CERT` | unset | SAML identity-provider signing certificate |
+| `PRG32_SECURE_COOKIES` | `false` | Set to `true` behind production HTTPS so browsers only send session cookies over TLS |
 
 ## Production Checklist
 
@@ -59,6 +60,10 @@ storage mounted outside the container or process directory.
 - Configure mDNS, SMTP, OIDC, and SAML2 from `/setup` or environment variables.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
 - Put the service behind HTTPS termination.
+- Set `PRG32_SECURE_COOKIES=true` after HTTPS is in place.
+- Complete every hard requirement in [GDPR and privacy operations](gdpr.md),
+  including controller contacts, lawful bases, retention, processor terms,
+  rights handling, backup expiry, incident response, and any required DPIA.
 - Preserve `PRG32_STORE_DATA` on durable storage.
 - Use `/admin/backup` for full backups, or back up `cartridge_store.sqlite`,
   `index.json`, `cartridges/`, custom static assets, and pending submissions
