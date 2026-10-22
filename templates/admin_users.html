@@ -8,6 +8,7 @@
   <form method="post" action="/admin/users" class="inline-admin-form">
     <input name="username" placeholder="username" required>
     <input name="email" type="email" placeholder="email" required>
+    <input name="public_handle" placeholder="public handle" pattern="[a-z0-9][a-z0-9_-]{2,31}" required>
     <input name="password" type="password" placeholder="password">
     <select name="role">
       {% for role in roles %}
@@ -24,7 +25,7 @@
   {% endif %}
   <table>
     <thead>
-      <tr><th>Username</th><th>Email</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
+      <tr><th>Username</th><th>Email</th><th>Public handle</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
     </thead>
     <tbody>
       {% for user in users %}
@@ -32,6 +33,7 @@
         <form method="post" action="/admin/users/{{ user.id }}">
           <td><input name="username" value="{{ user.username }}" required></td>
           <td><input name="email" type="email" value="{{ user.email }}" required></td>
+          <td><input name="public_handle" value="{{ user.public_handle }}" pattern="[a-z0-9][a-z0-9_-]{2,31}" required></td>
           <td>
             <select name="role">
               {% for role in roles %}

@@ -51,6 +51,14 @@ def safe_version(version: str) -> str:
     return _check_safe(version, SAFE_VERSION_RE, "version")
 
 
+def _contains_personal_value(value: Any, needles: set[str]) -> bool:
+    if isinstance(value, dict):
+        return any(_contains_personal_value(item, needles) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_personal_value(item, needles) for item in value)
+    return isinstance(value, str) and value.strip() in needles
+
+
 class GameStore:
     def __init__(self, data_dir: str | Path) -> None:
         self.data_dir = Path(data_dir)
@@ -86,6 +94,54 @@ class GameStore:
             encoding="utf-8",
         )
         tmp.replace(self.index_path)
+
+    def replace_publisher_identities(self, old_values: set[str], replacement: str) -> int:
+        """Replace denormalised account identifiers without touching authorship."""
+        values = {str(value).strip() for value in old_values if str(value).strip()}
+        if not values:
+            return 0
+        with self._mutation_lock:
+            index = self.load_index()
+            changed = 0
+            for game in index.get("games", {}).values():
+                if game.get("publisher") in values:
+                    game["publisher"] = replacement
+                    changed += 1
+                for version in game.get("versions", {}).values():
+                    if version.get("published_by") in values:
+                        version["published_by"] = replacement
+                        changed += 1
+                    for variant in version.get("architectures", {}).values():
+                        if variant.get("published_by") in values:
+                            variant["published_by"] = replacement
+                            changed += 1
+            if changed:
+                self.save_index(index)
+            return changed
+
+    def publisher_records(self, public_handle: str) -> list[dict[str, str]]:
+        records: list[dict[str, str]] = []
+        for game_id, game in self.load_index().get("games", {}).items():
+            for version_id, version in game.get("versions", {}).items():
+                if version.get("published_by") == public_handle:
+                    records.append({"game_id": game_id, "version": version_id, "role": "publisher"})
+                for architecture, variant in version.get("architectures", {}).items():
+                    if variant.get("published_by") == public_handle:
+                        records.append({"game_id": game_id, "version": version_id, "architecture": architecture, "role": "variant publisher"})
+        return records
+
+    def personal_catalog_records(self, values: set[str]) -> list[dict[str, str]]:
+        """Locate publisher and intentionally published authorship references."""
+        needles = {str(value).strip() for value in values if str(value).strip()}
+        records: list[dict[str, str]] = []
+        for game_id, game in self.load_index().get("games", {}).items():
+            for version_id, version in game.get("versions", {}).items():
+                if version.get("published_by") in needles:
+                    records.append({"game_id": game_id, "version": version_id, "role": "publisher"})
+                for field in ("metadata", "colophon"):
+                    if _contains_personal_value(version.get(field), needles):
+                        records.append({"game_id": game_id, "version": version_id, "role": f"published {field}"})
+        return records
 
     def publish(
         self,
@@ -343,7 +399,6 @@ class GameStore:
             else:
                 haystack.append(str(author))
         return needle in " ".join(haystack).lower()
-
     def resolve_variant(
         self,
         game_id: str,

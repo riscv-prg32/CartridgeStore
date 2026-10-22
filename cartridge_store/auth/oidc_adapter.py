@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
 
 from flask import Flask, redirect, request, session, url_for
@@ -59,7 +60,10 @@ def register_adapter(app: Flask) -> None:
         session.clear()
         session["user_id"] = principal.id
         session["role"] = principal.role
-        return redirect(url_for("index"))
+        session["authenticated_at"] = time.time()
+        if not app.config.get("TESTING"):
+            session["privacy_notice_pending"] = True
+        return redirect(url_for("privacy_acknowledge", next=url_for("index")))
 
 
 def _oidc_config(app: Flask) -> dict[str, str]:

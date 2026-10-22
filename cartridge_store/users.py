@@ -21,8 +21,8 @@ def _row_dict(row: Any | None) -> dict[str, Any] | None:
 def find_user(username: str) -> dict[str, Any] | None:
     return _row_dict(
         get_db().execute(
-            "SELECT id, username, email, role, created_at, last_login FROM users WHERE username = ?",
-            (username,),
+            "SELECT id, public_handle AS username, role, created_at FROM users WHERE public_handle = ? OR username = ?",
+            (username, username),
         ).fetchone()
     )
 
@@ -126,6 +126,8 @@ def register_user_routes(app: Flask) -> None:
         user = find_user(username)
         if not user:
             return render_template("error.html", error="User not found"), 404
+        if username != user["username"] and not can_view_user(user):
+            return render_template("error.html", error="User not found"), 404
         run_count = get_db().execute(
             "SELECT COUNT(*) AS count FROM runs WHERE user_id = ?",
             (user["id"],),
@@ -142,6 +144,8 @@ def register_user_routes(app: Flask) -> None:
         user = find_user(username)
         if not user:
             return render_template("error.html", error="User not found"), 404
+        if username != user["username"] and not can_view_user(user):
+            return render_template("error.html", error="User not found"), 404
         if not can_view_user(user):
             return _forbidden()
         page = max(request.args.get("page", default=1, type=int), 1)
@@ -153,6 +157,8 @@ def register_user_routes(app: Flask) -> None:
     def user_run_detail(username: str, run_id: str):
         user = find_user(username)
         if not user:
+            return render_template("error.html", error="User not found"), 404
+        if username != user["username"] and not can_view_user(user):
             return render_template("error.html", error="User not found"), 404
         run = load_run(run_id)
         if not run:

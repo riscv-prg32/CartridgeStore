@@ -33,18 +33,28 @@ def validate_registration_password(form: Any) -> list[str]:
     return errors
 
 
-def create_local_user(username: str, email: str, password: str, *, role: str = "user") -> int:
+def create_local_user(
+    username: str,
+    email: str,
+    password: str,
+    *,
+    role: str = "user",
+    public_handle: str = "",
+) -> int:
+    from . import unique_public_handle
+
     db = get_db()
     cursor = db.execute(
         """
-        INSERT INTO users(username, email, password_hash, role)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users(username, email, password_hash, role, public_handle)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
             username.strip(),
             email.strip().lower(),
             generate_password_hash(password),
             normalize_role(role),
+            unique_public_handle(public_handle),
         ),
     )
     db.commit()

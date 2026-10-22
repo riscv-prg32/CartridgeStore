@@ -57,11 +57,18 @@ inventory and configure each one independently.
 
 - `/privacy` provides the versioned Article 13/14 notice.
 - `/account/privacy` gives signed-in users the rights dashboard.
-- `GET /api/me/export` provides a structured, machine-readable JSON copy.
+- `GET /api/me/export` provides a structured Article 15-oriented JSON copy,
+  including processing information. It also contains portable user-provided
+  records but is not a promise that every field falls within Article 20.
 - `POST /account/delete` erases the account and directly owned telemetry and
   metrics, revokes tokens, and anonymises identifiers on shared classroom
   records. The last administrator cannot erase itself until another admin is
   appointed.
+- Intentionally published creative credits are separated from account
+  identifiers. Erasure anonymises account submitter/reviewer/publisher fields;
+  possible authorship matches enter the administrator's manual review queue so
+  the controller can evaluate correction, erasure, expression, attribution,
+  and other applicable rights.
 - Account details can be corrected by an administrator. Other requests go to
   the configured privacy contact and must be handled without undue delay,
   normally within one month.
@@ -80,13 +87,14 @@ Defaults are intentionally finite:
 | Pseudonymous download events | 90 days |
 | Metrics runs and samples | 365 days |
 | Unused/expired registration records | 7 days |
-| Minimal hashed erasure audit events | 6 years |
+| Random-reference rights/audit events | 365 days |
 
-Cleanup runs at most once daily when the service receives traffic. An
-administrator can run it immediately:
+Cleanup is deliberately outside request handling. Schedule the idempotent CLI
+command at least daily:
 
 ```bash
-curl -X POST -b cookies.txt https://store.example.edu/admin/privacy/cleanup
+flask --app app:app privacy-cleanup --dry-run
+flask --app app:app privacy-cleanup
 ```
 
 The response reports deletion counts. Monitor it as an operational control.
@@ -95,12 +103,35 @@ container logs, exports, or backups; configure those systems separately.
 
 ## Security and Incident Response
 
-The application sets HttpOnly/SameSite session cookies, privacy-preserving
-referrer and browser capability headers, `no-store` for rights/account routes,
-hashed passwords and API tokens, role-based access, upload limits, and safe
-content validation. Production still requires HTTPS, secure cookies, secret
+The application sets HttpOnly/SameSite session cookies, CSRF tokens on browser
+forms, recent-authentication checks for sensitive privacy actions, a Content
+Security Policy, privacy-preserving referrer/capability headers, `no-store` for
+rights/account routes, hashed passwords and API tokens, role-based access,
+upload limits, and safe content validation. HTTPS responses also receive HSTS.
+Production still requires correct proxy HTTPS handling, secure cookies, secret
 rotation, network/access controls, monitoring, tested restoration, and timely
 security updates.
+
+## Identity Migration
+
+Account email/username values are private. `users.public_handle` is the only
+account label intended for public presentation. On migration, non-email safe
+usernames are retained as handles; email usernames receive deterministic
+non-identifying `player-NNNNNN` handles. Records with a user ID are rewritten to
+the corresponding handle. Unattributed legacy strings containing `@` become
+`legacy user`. Catalog publisher fields are migrated atomically under the
+filesystem store lock. Published authors/developers in cartridge metadata are
+creative credits and are not silently rewritten.
+
+## Notice Versioning
+
+The Setup page stores the controller's actual processing records as a JSON
+array. Each record must identify its purpose, data categories, selected lawful
+basis, and retention rule; legitimate-interest records should identify the
+specific interest. `/admin/privacy` reports readiness, cleanup health, and
+rights requests needing review. Local and external onboarding records the exact
+notice version and presentation channel. A material version change causes
+existing users to see the acknowledgement page on their next production login.
 
 If a personal-data breach occurs, contain it, preserve evidence, identify the
 data and people affected, assess risk, document the decision, and notify the

@@ -41,12 +41,14 @@ from .auth import (
     login_required,
     register_auth_routes,
     set_user_groups,
+    unique_public_handle,
+    normalize_public_handle,
 )
 from .database import close_db, get_db, reset_schema_cache
 from .mdns import register_mdns
 from .metrics import register_metrics_routes
 from .multiplayer import register_multiplayer_routes
-from .privacy import register_privacy_routes
+from .privacy import erase_user, register_privacy_routes
 from .review import create_submission, register_review_routes
 from .scores import register_score_routes
 from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
@@ -144,6 +146,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SECURE=os.environ.get("PRG32_SECURE_COOKIES", "false").lower() == "true",
+        CSRF_ENABLED=not bool(test_config and test_config.get("TESTING")),
         # Single sign-on and user sync with one PRG32-Construction-Kit (docs/accounts_and_sso.md).
         SSO_SECRET=os.environ.get("PRG32_SSO_SECRET", ""),
         SSO_PEER_URL=os.environ.get("PRG32_SSO_PEER_URL", ""),
@@ -168,7 +171,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     register_stats_routes(app, store)
     register_user_routes(app)
     register_review_routes(app, store)
-    register_privacy_routes(app)
+    register_privacy_routes(app, store)
     sso.register_sso_routes(app)
     register_mdns(app)
 
@@ -246,6 +249,16 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @app.post("/setup")
     @admin_required
     def setup_save():
+        processing_records = request.form.get("privacy_processing_records", "[]")
+        try:
+            parsed_records = json.loads(processing_records)
+            if not isinstance(parsed_records, list):
+                raise ValueError("must be a JSON array")
+        except (json.JSONDecodeError, ValueError) as exc:
+            return render_template(
+                "error.html",
+                error=f"Privacy processing records are invalid: {exc}",
+            ), 400
         checkbox_keys = {
             "auth_allow_registration",
             "publish_require_auth",
@@ -300,6 +313,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         role = request.form.get("role", "user")
+        try:
+            public_handle = unique_public_handle(request.form.get("public_handle", ""))
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
         if role not in ROLE_LEVELS:
             return jsonify({"ok": False, "error": "unknown role"}), 400
         if not username or not email:
@@ -307,14 +324,15 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         db = get_db()
         cursor = db.execute(
             """
-            INSERT INTO users(username, email, password_hash, role)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users(username, email, password_hash, role, public_handle)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 username,
                 email,
                 generate_password_hash(password or secrets.token_urlsafe(24)),
                 role,
+                public_handle,
             ),
         )
         db.commit()
@@ -330,6 +348,15 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         email = request.form.get("email", "").strip().lower()
         role = request.form.get("role", "user")
         password = request.form.get("password", "")
+        existing_handle = get_db().execute("SELECT public_handle FROM users WHERE id = ?", (user_id,)).fetchone()
+        try:
+            public_handle = normalize_public_handle(
+                request.form.get("public_handle", "") or (existing_handle["public_handle"] if existing_handle else "")
+            )
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        if get_db().execute("SELECT 1 FROM users WHERE public_handle = ? AND id != ?", (public_handle, user_id)).fetchone():
+            return jsonify({"ok": False, "error": "public handle is already in use"}), 400
         if role not in ROLE_LEVELS:
             return jsonify({"ok": False, "error": "unknown role"}), 400
         if user_id == principal.id and role != "admin":
@@ -337,17 +364,36 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if not username or not email:
             return jsonify({"ok": False, "error": "username and email are required"}), 400
         db = get_db()
-        previous = db.execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
+        previous = db.execute("SELECT email, username, public_handle FROM users WHERE id = ?", (user_id,)).fetchone()
         db.execute(
-            "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?",
-            (username, email, role, user_id),
+            "UPDATE users SET username = ?, email = ?, role = ?, public_handle = ? WHERE id = ?",
+            (username, email, role, public_handle, user_id),
         )
         if password:
             db.execute(
                 "UPDATE users SET password_hash = ? WHERE id = ?",
                 (generate_password_hash(password), user_id),
             )
+        for table, column, owner_column in (
+            ("scores", "submitted_by", "user_id"),
+            ("runs", "submitted_by", "user_id"),
+            ("cartridge_submissions", "submitted_by", "submitted_by_user_id"),
+            ("cartridge_submissions", "reviewed_by", "reviewed_by_user_id"),
+        ):
+            try:
+                db.execute(
+                    f"UPDATE {table} SET {column} = ? WHERE {owner_column} = ?",
+                    (public_handle, user_id),
+                )
+            except sqlite3.OperationalError as exc:
+                if "no such table" not in str(exc):
+                    raise
         db.commit()
+        if previous:
+            store.replace_publisher_identities(
+                {str(previous["username"]), str(previous["email"]), str(previous["public_handle"])},
+                public_handle,
+            )
         _set_groups_from_form(user_id)
         sso.user_changed(user_id, previous_email=str(previous["email"]) if previous else None)
         return redirect(url_for("admin_users"))
@@ -379,7 +425,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         principal = current_principal()
         if user_id == principal.id:
             return jsonify({"ok": False, "error": "admins cannot delete themselves"}), 400
-        deleted = _delete_user(user_id)
+        try:
+            deleted = erase_user(user_id, store)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
         if request.method == "DELETE":
             return jsonify({"ok": deleted})
         return redirect(url_for("admin_users"))
@@ -724,7 +773,7 @@ def _asset_extension(data: bytes) -> str | None:
 def _admin_user_rows(limit: int, offset: int) -> list[dict[str, Any]]:
     rows = get_db().execute(
         """
-        SELECT id, username, email, role, external_provider, created_at, last_login
+        SELECT id, username, email, public_handle, role, external_provider, created_at, last_login
         FROM users
         ORDER BY created_at ASC, id ASC
         LIMIT ? OFFSET ?
@@ -742,15 +791,6 @@ def _admin_user_rows(limit: int, offset: int) -> list[dict[str, Any]]:
 def _set_user_role(user_id: int, role: str) -> None:
     get_db().execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
     get_db().commit()
-
-
-def _delete_user(user_id: int) -> bool:
-    row = get_db().execute("SELECT email FROM users WHERE id = ?", (user_id,)).fetchone()
-    cursor = get_db().execute("DELETE FROM users WHERE id = ?", (user_id,))
-    get_db().commit()
-    if row is not None:
-        sso.user_deleted(str(row["email"]))
-    return cursor.rowcount > 0
 
 
 def _set_groups_from_form(user_id: int) -> None:

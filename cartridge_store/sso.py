@@ -190,7 +190,7 @@ def apply_record(data: Any) -> str:
 
     This never sends anything back, so two services cannot bounce a change forever.
     """
-    from .auth import _unique_username, set_user_groups
+    from .auth import _unique_username, set_user_groups, unique_public_handle
 
     init_schema_once("sso", init_sso_db)
     record = protocol.clean_record(data)
@@ -206,17 +206,23 @@ def apply_record(data: Any) -> str:
             return "stale"
         if row["role"] == "admin" and _admin_count(int(row["id"])) == 0:
             return "kept-last-admin"
-        db.execute("DELETE FROM users WHERE id = ?", (int(row["id"]),))
-        db.commit()
+        from .privacy import erase_user
+        from .store import GameStore
+
+        erase_user(
+            int(row["id"]),
+            GameStore(current_app.config["DATA_DIR"]),
+            notify_sso=False,
+        )
         return "deleted"
     if row is not None and not protocol.is_newer(record["updated_at"], local_stamp):
         return "stale"
     stamp = record["updated_at"] or protocol.timestamp_now()
     if row is None:
         cursor = db.execute(
-            "INSERT INTO users(username, email, password_hash, role, updated_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO users(username, email, password_hash, role, updated_at, public_handle) VALUES (?, ?, ?, ?, ?, ?)",
             (_unique_username(record["username"], record["email"]), record["email"], record["password_hash"],
-             record["role"], stamp),
+             record["role"], stamp, unique_public_handle()),
         )
         user_id = int(cursor.lastrowid)
         result = "created"
@@ -354,10 +360,15 @@ def register_sso_routes(app: Flask) -> None:
         session.clear()
         session["user_id"] = principal.id
         session["role"] = principal.role
+        session["authenticated_at"] = time.time()
+        if not current_app.config.get("TESTING"):
+            session["privacy_notice_pending"] = True
         target = request.form.get("next") or "/"
         if not target.startswith("/") or target.startswith("//"):
             target = "/"
-        return redirect(target)
+        if current_app.config.get("TESTING"):
+            return redirect(target)
+        return redirect(url_for("privacy_acknowledge", next=target))
 
     @app.context_processor
     def inject_sso() -> dict[str, Any]:

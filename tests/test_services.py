@@ -752,7 +752,7 @@ def test_user_runs_access_and_json_download(tmp_path) -> None:
 
     other = app.test_client()
     register(other, "bob@example.com")
-    assert other.get("/users/alice@example.com/runs").status_code == 403
+    assert other.get("/users/alice@example.com/runs").status_code == 404
     assert owner.get("/users/alice@example.com/runs").status_code == 200
     assert owner.get("/users/alice@example.com/runs/alice-run").status_code == 200
 

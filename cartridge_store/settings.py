@@ -66,6 +66,12 @@ DEFAULT_SETTINGS = {
     "privacy_download_retention_days": "90",
     "privacy_metrics_retention_days": "365",
     "privacy_registration_retention_days": "7",
+    "privacy_audit_retention_days": "365",
+    "privacy_representative": "",
+    "privacy_recipient_categories": "",
+    "privacy_transfer_details": "No international transfers are configured by the Cartridge Store itself.",
+    "privacy_data_provision": "Account email and authentication data are required to provide an account; without them an account cannot be created.",
+    "privacy_processing_records": "[]",
 }
 
 # Keyed by database path so separate apps (and tests) never share themes.

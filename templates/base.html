@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="{{ theme_primary_color }}">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="manifest" href="/manifest.webmanifest">
   {% if theme_favicon_url %}<link rel="icon" href="{{ theme_favicon_url }}">{% endif %}
   <link rel="stylesheet" href="/static/style.css">
@@ -44,6 +45,7 @@
       <a href="/admin/users">Users</a>
       <a href="/admin/groups">Groups</a>
       <a href="/admin/backup">Backup</a>
+      <a href="/admin/privacy">Privacy readiness</a>
       {% endif %}
       {% if current_user.authenticated and (current_user.role == "admin" or "editors" in current_user.groups) %}
       <a href="/admin/cartridges">Cartridges</a>

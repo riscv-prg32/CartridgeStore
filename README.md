@@ -221,6 +221,11 @@ change the per-signature room limit.
   self-service account erasure, finite telemetry retention, and browser security
   headers provide a privacy-by-design baseline.
 - The service uses no advertising or non-essential tracking cookies.
+- Email addresses are private account identifiers. Public profiles, scores,
+  metrics, reviews, and catalog publisher fields use a separate public handle.
+- State-changing browser forms use CSRF tokens; data export and account erasure
+  require a recently authenticated session, and local erasure also requires the
+  current password.
 
 ## Tests
 

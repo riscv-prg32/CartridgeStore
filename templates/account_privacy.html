@@ -11,8 +11,9 @@
 </section>
 <section>
   <h2>Erase account</h2>
-  <p>This removes your account, tokens, owned metrics runs and download records. Shared classroom records such as scores and reviewed submissions are anonymised. Legal exceptions may require the controller to handle a request manually. The last administrator must first appoint another administrator.</p>
+  <p>This removes your account, tokens, owned metrics runs and download records. Account identifiers on shared classroom records are anonymised. Intentionally published creative credits in cartridge metadata are retained for controller review and may be kept when a lawful exception applies. Contact the privacy address to challenge or correct a retained credit. The last administrator must first appoint another administrator.</p>
   <form method="post" action="/account/delete">
+    {% if not current_user.external_provider %}<label>Current password<input name="password" type="password" autocomplete="current-password" required></label>{% endif %}
     <label>Type DELETE to confirm<input name="confirmation" autocomplete="off" required></label>
     <button class="danger" type="submit">Erase my account</button>
   </form>

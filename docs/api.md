@@ -35,6 +35,18 @@ email address.
 | `GET` | `/api/me/export` | Machine-readable personal-data export |
 | `POST` | `/account/delete` | Erase the signed-in account after `confirmation=DELETE` |
 | `POST` | `/admin/privacy/cleanup` | Run configured retention cleanup (administrator) |
+
+Browser forms include a per-session CSRF token. JSON requests and authenticated
+Bearer-token clients retain the existing API contract; cookie-authenticated
+HTML/form clients must submit the web interface's `csrf_token`. Personal-data
+export requires recent authentication. Local account erasure submits
+`confirmation=DELETE` and the current `password`.
+
+Account email and login username are private. Public response fields such as
+`submitted_by`, `published_by`, and profile route names contain the separate
+safe public handle. Existing email-based profile URLs remain available only to
+that account and administrators during migration; anonymous requests receive a
+not-found response.
 | `GET` | `/auth/me` | Current user JSON |
 | `GET` | `/auth/tokens` | List your Bearer tokens or open the token manager |
 | `POST` | `/auth/tokens` | Create a Bearer token |

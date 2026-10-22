@@ -64,6 +64,8 @@ storage mounted outside the container or process directory.
 - Complete every hard requirement in [GDPR and privacy operations](gdpr.md),
   including controller contacts, lawful bases, retention, processor terms,
   rights handling, backup expiry, incident response, and any required DPIA.
+- Schedule `flask --app app:app privacy-cleanup` at least daily and monitor its
+  exit status plus `/admin/privacy`.
 - Preserve `PRG32_STORE_DATA` on durable storage.
 - Use `/admin/backup` for full backups, or back up `cartridge_store.sqlite`,
   `index.json`, `cartridges/`, custom static assets, and pending submissions
@@ -97,6 +99,31 @@ docker compose up --build
 
 The image continues if `zeroconf` is absent, but mDNS advertisement is disabled
 with a startup warning.
+
+### Scheduled privacy cleanup
+
+Cron example for a Python deployment:
+
+```cron
+17 2 * * * cd /srv/cartridge-store && .venv/bin/flask --app app:app privacy-cleanup
+```
+
+Equivalent systemd units can use `Type=oneshot` with
+`ExecStart=/srv/cartridge-store/.venv/bin/flask --app app:app privacy-cleanup`
+and a timer with `OnCalendar=daily`, `Persistent=true`, the same working
+directory, environment, service account, and data-volume permissions as the
+web service.
+
+Docker Compose host-timer example:
+
+```bash
+docker compose exec -T cartridge-store flask --app app:app privacy-cleanup
+```
+
+For Kubernetes, run the same command in a daily `CronJob` using the production
+image, database, data volume, secrets, and environment. Only one cleanup job
+should run at a time. Test first with `--dry-run`; a failure returns a non-zero
+status and is recorded for the privacy-readiness page.
 
 ## Continuous Integration and Delivery
 

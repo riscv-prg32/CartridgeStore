@@ -12,6 +12,8 @@ import json
 import os
 import secrets
 import smtplib
+import re
+import time
 from typing import Any, Callable, Iterable
 
 from flask import (
@@ -94,6 +96,8 @@ CREATE TABLE IF NOT EXISTS registration_tokens (
 CREATE INDEX IF NOT EXISTS registration_tokens_email_idx
 ON registration_tokens(email, used_at, expires_at);
 """
+
+PUBLIC_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,31}$")
 
 
 @dataclass(frozen=True)
@@ -243,6 +247,9 @@ def init_auth_db() -> None:
     db.executescript(AUTH_SCHEMA)
     # Changed whenever an account changes; user sync with a Construction Kit keeps the newest.
     add_column_if_missing(db, "users", "updated_at", "TEXT")
+    add_column_if_missing(db, "users", "public_handle", "TEXT")
+    _migrate_public_handles(db)
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_public_handle_idx ON users(public_handle)")
     db.execute("INSERT OR IGNORE INTO groups(name) VALUES ('editors')")
     db.commit()
     ensure_default_admin()
@@ -265,10 +272,10 @@ def ensure_default_admin() -> None:
     password = os.environ.get("PRG32_ADMIN_PASSWORD") or "password"
     cursor = db.execute(
         """
-        INSERT INTO users(username, email, password_hash, role)
-        VALUES (?, ?, ?, 'admin')
+        INSERT INTO users(username, email, password_hash, role, public_handle)
+        VALUES (?, ?, ?, 'admin', ?)
         """,
-        ("admin", "admin@localhost", generate_password_hash(password)),
+        ("admin", "admin@localhost", generate_password_hash(password), unique_public_handle("admin")),
     )
     db.commit()
     add_user_to_group(int(cursor.lastrowid), "editors")
@@ -279,7 +286,7 @@ def principal_from_row(row: Any | None, *, token: str = "") -> Principal:
         return ANONYMOUS
     return Principal(
         id=int(row["id"]),
-        name=str(row["username"]),
+        name=str(row["public_handle"] or f"player-{int(row['id']):06d}"),
         email=str(row["email"] or ""),
         role=normalize_role(str(row["role"] or "user")),
         token=token,
@@ -397,10 +404,10 @@ def upsert_external_user(
     if row is None:
         cursor = db.execute(
             """
-            INSERT INTO users(username, email, role, external_provider, external_id)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users(username, email, role, external_provider, external_id, public_handle)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (_unique_username(username, email), email, role, provider, external_id),
+            (_unique_username(username, email), email, role, provider, external_id, unique_public_handle()),
         )
         db.commit()
         _sync_user(int(cursor.lastrowid))
@@ -409,10 +416,11 @@ def upsert_external_user(
     db.execute(
         """
         UPDATE users
-        SET email = ?, external_provider = ?, external_id = ?
+        SET email = ?, external_provider = ?, external_id = ?,
+            public_handle = COALESCE(public_handle, ?)
         WHERE id = ?
         """,
-        (email, provider, external_id, int(row["id"])),
+        (email, provider, external_id, unique_public_handle(), int(row["id"])),
     )
     db.commit()
     _sync_user(int(row["id"]), previous_email=str(previous["email"]) if previous else None)
@@ -435,6 +443,43 @@ def _unique_username(preferred: str, email: str) -> str:
     while db.execute("SELECT 1 FROM users WHERE username = ?", (f"{email}-{suffix}",)).fetchone():
         suffix += 1
     return f"{email}-{suffix}"
+
+
+def normalize_public_handle(value: str) -> str:
+    handle = str(value or "").strip().lower()
+    if "@" in handle or not PUBLIC_HANDLE_RE.fullmatch(handle):
+        raise ValueError("public handle must be 3-32 lowercase letters, numbers, underscores, or hyphens")
+    return handle
+
+
+def unique_public_handle(preferred: str = "") -> str:
+    db = get_db()
+    if preferred:
+        candidate = normalize_public_handle(preferred)
+        if db.execute("SELECT 1 FROM users WHERE public_handle = ?", (candidate,)).fetchone() is None:
+            return candidate
+        raise ValueError("public handle is already in use")
+    while True:
+        candidate = "player-" + secrets.token_hex(4)
+        if db.execute("SELECT 1 FROM users WHERE public_handle = ?", (candidate,)).fetchone() is None:
+            return candidate
+
+
+def _migrate_public_handles(db: Any) -> None:
+    rows = db.execute("SELECT id, username, public_handle FROM users ORDER BY id").fetchall()
+    used = {str(row["public_handle"]) for row in rows if row["public_handle"]}
+    for row in rows:
+        if row["public_handle"]:
+            continue
+        username = str(row["username"] or "").strip().lower()
+        candidate = username if "@" not in username and PUBLIC_HANDLE_RE.fullmatch(username) else f"player-{int(row['id']):06d}"
+        base = candidate[:28]
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        db.execute("UPDATE users SET public_handle = ? WHERE id = ?", (candidate, int(row["id"])))
+        used.add(candidate)
 
 
 def authenticate_token(token: str, users: Iterable[Principal] | None = None) -> Principal:
@@ -493,6 +538,23 @@ def current_principal() -> Principal:
     principal = authenticate_token(request_token())
     g.prg32_principal = principal
     return principal
+
+
+def csrf_token() -> str:
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return str(token)
+
+
+def recently_authenticated(max_age_seconds: int = 900) -> bool:
+    if request_token():
+        return True
+    try:
+        return time.time() - float(session.get("authenticated_at", 0)) <= max_age_seconds
+    except (TypeError, ValueError):
+        return False
 
 
 def _wants_json() -> bool:
@@ -721,7 +783,21 @@ def register_auth_routes(app: Flask) -> None:
 
     @app.context_processor
     def inject_current_user() -> dict[str, Any]:
-        return {"current_user": current_principal()}
+        return {"current_user": current_principal(), "csrf_token": csrf_token}
+
+    @app.before_request
+    def protect_browser_forms_from_csrf():
+        if not current_app.config.get("CSRF_ENABLED", True):
+            return None
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        if request.is_json or request_token() or request.path in {"/auth/saml/acs", "/auth/sso/accept"}:
+            return None
+        supplied = request.form.get("csrf_token", "") or request.headers.get("X-CSRF-Token", "")
+        expected = session.get("csrf_token", "")
+        if expected and supplied and hmac.compare_digest(str(expected), str(supplied)):
+            return None
+        return _auth_failure("invalid or missing CSRF token", 400)
 
     @app.get("/auth/register")
     def auth_register_form():
@@ -759,7 +835,17 @@ def register_auth_routes(app: Flask) -> None:
             link = url_for("auth_register_complete_form", token=token, _external=True)
             _send_registration_email(email, link)
         if _wants_json():
-            return jsonify({"ok": True, "email": email, "message": "registration email sent"})
+            from ..privacy import PRIVACY_NOTICE_VERSION
+
+            return jsonify({
+                "ok": True,
+                "email": email,
+                "message": "registration email sent",
+                "privacy_notice": {
+                    "version": PRIVACY_NOTICE_VERSION,
+                    "url": url_for("privacy_notice", _external=True),
+                },
+            })
         return render_template("auth_register_sent.html", email=email)
 
     @app.get("/auth/register/complete")
@@ -780,6 +866,19 @@ def register_auth_routes(app: Flask) -> None:
             return render_template("error.html", error="Registration link is invalid or expired."), 400
 
         errors = validate_registration_password(request.form)
+        if current_app.config.get("CSRF_ENABLED", True):
+            from ..privacy import PRIVACY_NOTICE_VERSION
+
+            if request.form.get("privacy_notice_version", "") != PRIVACY_NOTICE_VERSION:
+                errors.append("you must acknowledge the current privacy notice")
+        public_handle = request.form.get("public_handle", "")
+        if public_handle:
+            try:
+                normalize_public_handle(public_handle)
+                if get_db().execute("SELECT 1 FROM users WHERE public_handle = ?", (public_handle.strip().lower(),)).fetchone():
+                    errors.append("public handle is already in use")
+            except ValueError as exc:
+                errors.append(str(exc))
         if errors:
             if _wants_json():
                 return jsonify({"ok": False, "error": "; ".join(errors)}), 400
@@ -814,10 +913,11 @@ def register_auth_routes(app: Flask) -> None:
             email,
             request.form["password"],
             role=role,
+            public_handle=public_handle,
         )
         from ..privacy import mark_privacy_notice_delivered
 
-        mark_privacy_notice_delivered(user_id)
+        mark_privacy_notice_delivered(user_id, "api" if _wants_json() else "local-registration")
         if role == "admin":
             add_user_to_group(user_id, "editors")
         _mark_registration_token_used(int(record["id"]))
@@ -825,6 +925,7 @@ def register_auth_routes(app: Flask) -> None:
         session.clear()
         session["user_id"] = user_id
         session["role"] = role
+        session["authenticated_at"] = time.time()
         if _wants_json():
             return jsonify({"ok": True, "user": load_user(user_id).as_dict()})
         flash("Account created.")
@@ -851,6 +952,17 @@ def register_auth_routes(app: Flask) -> None:
         session.clear()
         session["user_id"] = principal.id
         session["role"] = principal.role
+        session["authenticated_at"] = time.time()
+        if not current_app.config.get("TESTING"):
+            from ..privacy import PRIVACY_NOTICE_VERSION
+
+            notice = get_db().execute(
+                "SELECT privacy_notice_version FROM users WHERE id = ?",
+                (principal.id,),
+            ).fetchone()
+            if not notice or notice["privacy_notice_version"] != PRIVACY_NOTICE_VERSION:
+                session["privacy_notice_pending"] = True
+                return redirect(url_for("privacy_acknowledge", next=_next_url()))
         if _wants_json():
             return jsonify({"ok": True, "user": principal.as_dict()})
         return redirect(_next_url())

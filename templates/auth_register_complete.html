@@ -12,9 +12,12 @@
   {% endif %}
   <form method="post" action="/auth/register/complete">
     <input type="hidden" name="token" value="{{ token }}">
-    <label>Username<input value="{{ email }}" disabled></label>
+    <label>Account email<input value="{{ email }}" disabled></label>
+    <label>Public handle<input name="public_handle" value="{{ request.form.public_handle or '' }}" pattern="[a-z0-9][a-z0-9_-]{2,31}" minlength="3" maxlength="32" autocomplete="nickname" required></label>
+    <p class="form-help">This handle is public. Do not use your email address or other private information.</p>
     <label>Password<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
     <label>Confirm Password<input name="password_confirm" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label class="check-row"><input name="privacy_notice_version" type="checkbox" value="2026-10-21" required> I have read the <a href="/privacy" target="_blank" rel="noopener">privacy notice</a> dated 2026-10-21.</label>
     <button class="primary" type="submit">Create Account</button>
   </form>
 </section>

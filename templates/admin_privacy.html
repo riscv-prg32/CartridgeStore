@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Privacy Readiness - {{ store_name }}{% endblock %}
+{% block content %}
+<section>
+  <h1>Privacy readiness</h1>
+  <p>Status: <strong>{{ "ready" if privacy.ready else "incomplete" }}</strong></p>
+  {% if not privacy.ready %}<p class="error-text">Complete the controller, authority, contact, and processing-record fields before production use.</p>{% endif %}
+  <p>Notice version: {{ privacy.notice_version }}</p>
+  <p>Last cleanup: {{ cleanup.last_success if cleanup else "never" }}</p>
+  {% if cleanup and cleanup.last_error %}<p class="error-text">Last cleanup error: {{ cleanup.last_error }}</p>{% endif %}
+  <p><a href="/setup">Edit settings</a> · <a href="/privacy">View public notice</a></p>
+  <h2>Requests requiring review</h2>
+  {% for item in rights_requests %}<p><code>{{ item.event_ref }}</code> — {{ item.request_type }} — {{ item.status }} — {{ item.created_at }}</p>{% else %}<p>None.</p>{% endfor %}
+</section>
+{% endblock %}

@@ -7,16 +7,24 @@ the hard checklist in [GDPR and privacy operations](gdpr.md). Review the public
 notice at `/privacy` from a logged-out browser. Test a non-admin account's JSON
 export and erasure flow at `/account/privacy`.
 
-Retention cleanup runs daily with normal traffic. Run and observe it manually
-after changing retention settings:
+Retention cleanup does not depend on web traffic. Schedule it daily and run it
+manually after changing retention settings:
 
 ```bash
-curl -X POST -b cookies.txt http://127.0.0.1:5080/admin/privacy/cleanup
+flask --app app:app privacy-cleanup --dry-run
+flask --app app:app privacy-cleanup
 ```
 
 The response lists deleted download events, metrics runs, and incomplete
 registration records. Separately expire proxy/SMTP/IdP logs, exports, and
 backups; they are outside Cartridge Store's database cleanup.
+
+Use `/admin/privacy` to verify that all controller disclosures are complete,
+inspect the last cleanup result, and find erasure requests whose published
+creative credits require manual review. Browser administration requires a CSRF
+token supplied by the web interface. Privacy export and erasure require a login
+within the last 15 minutes; a local account must also provide its current
+password for erasure.
 
 This page collects day-to-day operational notes for running PRG32 Cartridge
 Store in a lab or classroom.

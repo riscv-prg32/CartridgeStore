@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Privacy Notice - {{ store_name }}{% endblock %}
+{% block content %}
+<section class="auth-panel">
+  <h1>Privacy notice update</h1>
+  {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+  <p>Before continuing, read the <a href="/privacy" target="_blank" rel="noopener">privacy notice dated {{ privacy.notice_version }}</a>.</p>
+  <form method="post" action="/auth/privacy-acknowledge">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="check-row"><input type="checkbox" name="privacy_notice_version" value="{{ privacy.notice_version }}" required> I acknowledge that this notice was presented to me.</label>
+    <button class="primary" type="submit">Continue</button>
+  </form>
+</section>
+{% endblock %}
