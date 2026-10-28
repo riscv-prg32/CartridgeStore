@@ -265,6 +265,8 @@ Integrate with clients and tools:
 
 - [Accounts and single sign-on](docs/accounts_and_sso.md): sharing users
   with a PRG32-Construction-Kit.
+- [Install over USB](docs/usb_install.md): putting a published cartridge on a
+  PRG32 connected to the visitor's computer, from the game page (Web Serial).
 - [Unified service API](docs/api.md): discovery document, auth endpoints,
   admin endpoints, cartridge package format, editor verification API, scores,
   metrics, statistics, multiplayer, and compatibility notes.
@@ -278,6 +280,7 @@ What to read for common tasks:
   [Operations](docs/operations.md).
 - Create a new PRG32 game cartridge:
   [Getting started with PRG32 game development](docs/getting_started_game_development.md).
+- Install a cartridge on a PRG32 over USB: [Install over USB](docs/usb_install.md).
 - Publish a cartridge package: [Getting started](docs/getting_started.md) for
   the browser flow, or [Unified service API](docs/api.md) for the API flow.
 - Build firmware or prepare PlatformIO/ESP-IDF:

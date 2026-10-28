@@ -1,4 +1,4 @@
-const CACHE_NAME = "prg32-cartridge-store-v1";
+const CACHE_NAME = "prg32-cartridge-store-v2";
 const SHELL = [
   "/",
   "/publish",
@@ -24,6 +24,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") {
+    return;
+  }
+  // API answers and cartridge downloads always come from the network, so a
+  // stale cartridge is never installed over USB or shown as current.
+  if (new URL(request.url).pathname.startsWith("/api/")) {
     return;
   }
   event.respondWith(

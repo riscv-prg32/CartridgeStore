@@ -39,6 +39,39 @@
   </div>
 </section>
 
+{% set usb_variant = game.variants.get("esp32c6") if game.variants else None %}
+{% if usb_variant %}
+<section class="usb-panel" id="usbInstall" aria-labelledby="usbInstallTitle"
+         data-game="{{ game.id }}" data-version="{{ game.selected_version }}" data-title="{{ game.title }}"
+         data-sha256="{{ usb_variant.sha256 or '' }}" data-size="{{ usb_variant.size }}">
+  <h2 id="usbInstallTitle">Install on a PRG32 over USB</h2>
+  <p>Connect the console's <strong>USB</strong> connector (not UART) to this computer and use Chrome or Edge.
+     The PRG32 keeps running its firmware: it shows the cartridge name, the slot and the progress, checks the
+     cartridge, and changes no other slot.</p>
+  <p class="usb-note" id="usbUnsupported" hidden>This browser cannot reach USB devices. Open this page in Chrome or
+     Edge, over HTTPS or on this computer as <code>localhost</code>.</p>
+  <div class="usb-controls">
+    <label for="usbSlot">Slot
+      <select id="usbSlot">
+        {% for slot in range(8) %}<option value="cart{{ slot }}">cart{{ slot }}</option>{% endfor %}
+      </select>
+    </label>
+    <label for="usbCommand">After installing
+      <select id="usbCommand">
+        <option value="store">Store and return to setup</option>
+        <option value="run">Run the cartridge</option>
+      </select>
+    </label>
+  </div>
+  <label class="usb-confirm"><input type="checkbox" id="usbConfirm"> Replace what is in this slot. The PRG32 erases
+    it when the transfer starts.</label>
+  <button type="button" id="usbInstallStart" disabled>Connect and install over USB</button>
+  <progress id="usbProgress" max="100" value="0" hidden aria-label="USB installation progress"></progress>
+  <p class="usb-status" id="usbStatus" role="status" aria-live="polite"></p>
+  <pre class="usb-log" id="usbLog" hidden></pre>
+</section>
+{% endif %}
+
 <section class="split">
   <div>
     <h2>Versions</h2>
@@ -92,4 +125,8 @@
   </details>
 </section>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/usb_install.js"></script>
 {% endblock %}

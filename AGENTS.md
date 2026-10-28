@@ -74,6 +74,16 @@ Do not break existing firmware/tool clients:
 When changing response shapes, preserve old fields and add new optional fields
 instead of replacing existing ones.
 
+## USB Installation
+
+- `static/js/prg32_usb_protocol.js` must stay byte-identical to
+  `static/js/prg32_usb_protocol.js` in PRG32-Construction-Kit; the contract is
+  PRG32 `docs/software/web_usb_deployment.md`.
+- Check a cartridge (catalog SHA-256, size, console ABI and limits) before
+  sending anything to a console, and never change the serial DTR/RTS lines.
+- Keep the service worker from caching `/api/` answers.
+- See [docs/usb_install.md](docs/usb_install.md).
+
 ## Single Sign-On
 
 - `cartridge_store/sso_protocol.py` must stay identical to

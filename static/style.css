@@ -359,6 +359,7 @@ h2 {
 }
 
 .download-panel,
+.usb-panel,
 .split,
 .colophon,
 .auth-panel,
@@ -612,4 +613,62 @@ svg {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.usb-controls {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  margin-bottom: 12px;
+}
+
+.usb-confirm {
+  align-items: center;
+  display: flex;
+  font-weight: 400;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.usb-confirm input {
+  min-height: auto;
+  width: auto;
+}
+
+.usb-panel button:disabled {
+  background: #edf2ee;
+  color: var(--muted);
+  cursor: default;
+}
+
+.usb-panel progress {
+  display: block;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.usb-status.ok {
+  color: #1b7a3a;
+  font-weight: 700;
+}
+
+.usb-status.error {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.usb-note {
+  background: #fff7e6;
+  border: 1px solid #f0c36d;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.usb-log {
+  background: #f6f8f7;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  padding: 10px;
+  white-space: pre-wrap;
 }

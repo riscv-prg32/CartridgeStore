@@ -59,7 +59,9 @@ storage mounted outside the container or process directory.
 - Configure SMTP so user registration links are delivered by email.
 - Configure mDNS, SMTP, OIDC, and SAML2 from `/setup` or environment variables.
 - Disable Flask debug mode; use Gunicorn or the Docker image.
-- Put the service behind HTTPS termination.
+- Put the service behind HTTPS termination. Game pages can install cartridges
+  on a PRG32 over USB only on HTTPS (or `localhost`); see
+  [Install over USB](usb_install.md).
 - Set `PRG32_SECURE_COOKIES=true` after HTTPS is in place.
 - Complete every hard requirement in [GDPR and privacy operations](gdpr.md),
   including controller contacts, lawful bases, retention, processor terms,
