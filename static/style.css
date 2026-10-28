@@ -641,7 +641,7 @@ svg {
   cursor: default;
 }
 
-.usb-panel progress {
+.usb-panel progress:not([hidden]) {
   display: block;
   margin-top: 12px;
   width: 100%;

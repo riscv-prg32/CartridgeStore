@@ -84,5 +84,13 @@ Recorded on 2026-10-29: the DeviceDemo store bundle was published to a
 throwaway Store, downloaded as its `esp32c6` variant (21,931 bytes, digest
 matching the catalog), and installed with `run` into `cart6` of a physical
 ESP32-C6 prototype by the same client module, through PRG32-Construction-Kit's
-`tools/usb_device_check.mjs`: 8/8 checks passed in 1.67 s. A person-picked
-Web Serial session in a desktop browser on that console has not been recorded.
+`tools/usb_device_check.mjs`: 8/8 checks passed in 1.67 s.
+
+Recorded on 2026-10-29 in desktop Chrome on macOS, with the port picked by a
+person in Chrome's chooser: the game page of a local Store
+(`http://127.0.0.1:5081`) installed the same DeviceDemo build into `cart5` with
+**run**. The page reported `cart5 holds PRG32 Device Demo+ and it is running.`,
+the Store logged the `esp32c6` download, and the console kept answering
+afterwards without restarting. When the button was pressed by browser
+automation instead of a person, Chrome closed the chooser at once and the page
+correctly reported that nothing was written.

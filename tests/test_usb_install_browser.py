@@ -74,6 +74,7 @@ def wait_for_status(page, kind: str) -> str:
 def test_a_visitor_installs_a_cartridge_over_usb(chromium, live_store) -> None:
     context, page, errors = game_page(chromium, live_store)
     assert page.is_disabled("#usbInstallStart")
+    assert not page.is_visible("#usbProgress")
     page.select_option("#usbSlot", "cart4")
     page.check("#usbConfirm")
     page.click("#usbInstallStart")
