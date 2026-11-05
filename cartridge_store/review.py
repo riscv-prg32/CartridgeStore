@@ -8,12 +8,13 @@ from pathlib import Path
 import shutil
 from typing import Any
 
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_file, url_for
 
 from . import prg32_format as fmt
 from .auth import Principal, current_principal, editor_required
 from .database import get_db, init_schema_once
-from .store import GameStore, StoreError, safe_game_id, safe_version
+from .logs import log_event
+from .store import PREVIEW_FILENAME, GameStore, StoreError, is_mp4, safe_game_id, safe_version
 
 
 REVIEW_SCHEMA = """
@@ -68,7 +69,7 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
-def create_submission(prepared: list[dict[str, Any]]) -> dict[str, Any]:
+def create_submission(prepared: list[dict[str, Any]], preview: bytes | None = None) -> dict[str, Any]:
     if not prepared:
         raise StoreError("bundle did not contain any cartridge variants")
     metadata = _common_metadata(prepared)
@@ -97,6 +98,10 @@ def create_submission(prepared: list[dict[str, Any]]) -> dict[str, Any]:
     architectures: list[dict[str, str]] = []
     try:
         pending_dir.mkdir(parents=True, exist_ok=False)
+        if preview is not None:
+            if not is_mp4(preview):
+                raise StoreError("preview.mp4 must be an MP4 video")
+            (pending_dir / PREVIEW_FILENAME).write_bytes(preview)
         for item in prepared:
             filename = f"{item['architecture']}.prg32"
             stored = relative_dir / filename
@@ -171,7 +176,18 @@ def load_submission(submission_id: int) -> dict[str, Any] | None:
 def _inflate_submission(row: dict[str, Any]) -> dict[str, Any]:
     row["metadata"] = json.loads(row["metadata_json"])
     row["architectures"] = json.loads(row["architectures_json"])
+    row["has_preview"] = bool(row.get("pending_dir")) and pending_preview_path(row) is not None
     return row
+
+
+def pending_preview_path(submission: dict[str, Any]) -> Path | None:
+    """Path of a pending submission's preview video, if it has one."""
+    if not submission.get("pending_dir"):
+        return None
+    path = (_data_dir() / str(submission["pending_dir"]) / PREVIEW_FILENAME).resolve()
+    if _data_dir().resolve() not in path.parents or not path.is_file():
+        return None
+    return path
 
 
 def editable_metadata_from_form(original: dict[str, Any]) -> dict[str, Any]:
@@ -239,6 +255,9 @@ def approve_submission(store: GameStore, submission_id: int, metadata: dict[str,
         )
 
     _publish_prepared(store, prepared)
+    preview = pending_preview_path(submission)
+    if preview is not None:
+        store.attach_preview(metadata["id"], metadata["version"], preview.read_bytes())
     reviewer = current_principal()
     get_db().execute(
         """
@@ -255,6 +274,7 @@ def approve_submission(store: GameStore, submission_id: int, metadata: dict[str,
     get_db().commit()
     if submission["pending_dir"]:
         shutil.rmtree(_data_dir() / submission["pending_dir"], ignore_errors=True)
+    log_event("review", "submission.verified", f"Submission #{submission_id} published as {metadata['id']} {metadata['version']}")
     return load_submission(submission_id) or {}
 
 
@@ -279,6 +299,7 @@ def reject_submission(submission_id: int, reviewer: Principal | None = None) -> 
     get_db().commit()
     if submission["pending_dir"]:
         shutil.rmtree(_data_dir() / submission["pending_dir"], ignore_errors=True)
+    log_event("review", "submission.rejected", f"Submission #{submission_id} ({submission['game_id']} {submission['version']}) rejected")
     return load_submission(submission_id) or {}
 
 
@@ -357,6 +378,15 @@ def register_review_routes(app: Flask, store: GameStore) -> None:
         if submission is None:
             return render_template("error.html", error="Submission not found"), 404
         return render_template("editor_submission.html", submission=submission)
+
+    @app.get("/editor/submissions/<int:submission_id>/preview")
+    @editor_required
+    def editor_submission_preview(submission_id: int):
+        submission = load_submission(submission_id)
+        path = pending_preview_path(submission) if submission else None
+        if path is None:
+            return render_template("error.html", error="Preview not found"), 404
+        return send_file(path, mimetype="video/mp4", conditional=True)
 
     @app.post("/editor/submissions/<int:submission_id>/verify")
     @editor_required

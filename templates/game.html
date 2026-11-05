@@ -4,39 +4,70 @@
 {% block main_class %}detail{% endblock %}
 
 {% block content %}
-<section class="detail-head">
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="/">Store</a></li>
+    <li><a href="/games/{{ game.id }}" aria-current="page">{{ game.title }}</a></li>
+  </ol>
+</nav>
+
+<section class="detail-head" aria-labelledby="gameTitle">
   <img class="detail-icon" src="/api/games/{{ game.id }}/icon?version={{ game.selected_version }}" alt="">
   <div>
-    <h1>{{ game.title }}</h1>
-    <p>{{ game.summary }}</p>
-    <div class="meta-row">
-      <span>{{ game.id }}</span>
-      <span>v{{ game.selected_version }}</span>
-      <span>{{ download_count }} downloads</span>
-    </div>
-    <div class="tag-row">
-      {% for tag in game.tags %}
-      <span>{{ tag }}</span>
-      {% endfor %}
-    </div>
+    <h1 id="gameTitle">{{ game.title }}</h1>
+    <p class="lead">{{ game.summary }}</p>
+    <dl class="fact-row">
+      <div><dt>ID</dt><dd><code>{{ game.id }}</code></dd></div>
+      <div><dt>Version</dt><dd>{{ game.selected_version }}{% if game.selected_version != game.latest_version %} (latest is <a href="/games/{{ game.id }}">{{ game.latest_version }}</a>){% endif %}</dd></div>
+      <div><dt>Downloads</dt><dd>{{ download_count }}</dd></div>
+      {% if game.updated_at %}<div><dt>Updated</dt><dd><time datetime="{{ game.updated_at }}">{{ game.updated_at[:10] }}</time></dd></div>{% endif %}
+    </dl>
+    {% if game.tags %}
+    <p class="tag-row"><span class="visually-hidden">Tags:</span>
+      {% for tag in game.tags %}<a class="tag" href="{{ url_for('index', q=tag) }}">{{ tag }}</a>{% endfor %}
+    </p>
+    {% endif %}
   </div>
 </section>
 
-{% if game.variants and game.variants[game.architectures[0]].has_screenshot %}
-<section class="media-panel">
-  <img src="/api/games/{{ game.id }}/screenshot?version={{ game.selected_version }}&architecture={{ game.architectures[0] }}" alt="">
+{% set first_arch = game.architectures[0] if game.architectures else None %}
+{% set has_shot = first_arch and game.variants[first_arch].has_screenshot %}
+{% if game.has_preview or has_shot %}
+<section class="media-panel" aria-labelledby="mediaTitle">
+  <h2 id="mediaTitle" class="visually-hidden">Preview</h2>
+  {% if game.has_preview %}
+  <figure class="video-figure">
+    <video controls preload="metadata" playsinline
+           aria-describedby="videoNote"
+           {% if has_shot %}poster="/api/games/{{ game.id }}/screenshot?version={{ game.selected_version }}&amp;architecture={{ first_arch }}"{% endif %}>
+      <source src="/api/games/{{ game.id }}/preview?version={{ game.selected_version }}" type="video/mp4">
+      <p>Your browser cannot play this video. <a href="/api/games/{{ game.id }}/preview?version={{ game.selected_version }}">Download the preview (MP4)</a>.</p>
+    </video>
+    <figcaption id="videoNote">Gameplay preview of {{ game.title }}. The video has no spoken audio; it does not start on its own.</figcaption>
+  </figure>
+  {% endif %}
+  {% if has_shot %}
+  <figure class="shot-figure">
+    <img src="/api/games/{{ game.id }}/screenshot?version={{ game.selected_version }}&amp;architecture={{ first_arch }}"
+         alt="Screenshot of {{ game.title }}">
+  </figure>
+  {% endif %}
 </section>
 {% endif %}
 
-<section class="download-panel">
-  <h2>Downloads</h2>
-  <div class="download-list">
+<section class="download-panel" aria-labelledby="downloadTitle">
+  <h2 id="downloadTitle">Download</h2>
+  <ul class="download-list">
     {% for arch in game.architectures %}
-    <a class="button" href="/api/games/{{ game.id }}/download?version={{ game.selected_version }}&architecture={{ arch }}">
-      {{ arch }} .prg32
-    </a>
+    {% set variant = game.variants[arch] %}
+    <li>
+      <a class="button" href="/api/games/{{ game.id }}/download?version={{ game.selected_version }}&amp;architecture={{ arch }}" download>
+        {{ arch }} cartridge<span class="visually-hidden"> for {{ game.title }}</span>
+      </a>
+      <span class="download-size">{{ (variant.size / 1024) | round(1) }} KiB</span>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
 </section>
 
 {% set usb_variant = game.variants.get("esp32c6") if game.variants else None %}
@@ -75,11 +106,11 @@
 <section class="split">
   <div>
     <h2>Versions</h2>
-    <div class="pill-row">
-      {% for version in game.versions %}
-      <a class="pill" href="/games/{{ game.id }}?version={{ version }}">{{ version }}</a>
+    <ul class="pill-row">
+      {% for version in game.versions | reverse %}
+      <li><a class="pill" href="/games/{{ game.id }}?version={{ version }}"{% if version == game.selected_version %} aria-current="page"{% endif %}>{{ version }}</a></li>
       {% endfor %}
-    </div>
+    </ul>
   </div>
   <div>
     <h2>Authors</h2>
@@ -93,16 +124,17 @@
   </div>
 </section>
 
-<section class="chart-panel">
-  <h2>Leaderboard</h2>
-  {{ score_chart | safe }}
+<section class="chart-panel" aria-labelledby="leaderboardTitle">
+  <h2 id="leaderboardTitle">Leaderboard</h2>
+  {% if scores %}{{ score_chart | safe }}{% endif %}
   <table>
-    <thead><tr><th>Player</th><th>Score</th></tr></thead>
+    <caption class="visually-hidden">Top scores for {{ game.title }}</caption>
+    <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
     <tbody>
       {% for score in scores %}
-      <tr><td>{{ score.player }}</td><td>{{ score.score }}</td></tr>
+      <tr><td>{{ loop.index }}</td><td>{{ score.player }}</td><td>{{ score.score }}</td></tr>
       {% else %}
-      <tr><td colspan="2">No scores yet.</td></tr>
+      <tr><td colspan="3">No scores yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -115,12 +147,15 @@
     <h3>{{ game.colophon.title }} {{ game.colophon.version }}</h3>
     <p>{{ game.colophon.subtitle }}</p>
     <p>{{ game.colophon.developer.name }}</p>
+    {% if game.colophon.controls %}
+    <h4>Controls</h4>
     <dl>
       {% for control in game.colophon.controls %}
       <dt>{{ control.input }}</dt>
       <dd>{{ control.action }}</dd>
       {% endfor %}
     </dl>
+    {% endif %}
     <p class="prompt">{{ game.colophon.start_prompt }}</p>
   </details>
 </section>

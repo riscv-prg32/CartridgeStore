@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Accessibility - {{ store_name }}{% endblock %}
+
+{% block content %}
+<article class="prose">
+  <h1>Accessibility statement</h1>
+  <p>{{ store_name }} aims to conform to the
+    <a href="https://www.w3.org/TR/WCAG21/">Web Content Accessibility Guidelines (WCAG) 2.1</a> at level AA,
+    the level referenced by the European standard EN 301 549.</p>
+
+  <h2>What we do</h2>
+  <ul>
+    <li>Every page has a skip link, labelled landmarks, one main heading and a logical heading order.</li>
+    <li>All controls work with a keyboard and show a visible focus indicator; menus are native disclosure widgets.</li>
+    <li>Form fields have visible labels; status messages are announced to screen readers.</li>
+    <li>Charts carry a text summary, and the figures are also shown in tables.</li>
+    <li>Preview videos never play on their own, have player controls and a written description.</li>
+    <li>Text and controls meet the 4.5:1 contrast ratio with the default theme, and pages reflow at 320 px width and 400% zoom.</li>
+    <li>Animations are disabled when the operating system asks for reduced motion.</li>
+  </ul>
+
+  <h2>Known limitations</h2>
+  <ul>
+    <li>Cartridge icons, screenshots and preview videos are provided by their authors. Preview videos have no captions;
+      they contain gameplay without speech.</li>
+    <li>Installing over USB needs a browser with Web Serial (Chrome or Edge). Downloading a cartridge works in every browser.</li>
+    <li>Administrators can change the theme colours. A custom theme may lower contrast; the Setup page warns about it.</li>
+  </ul>
+
+  <h2>Feedback</h2>
+  <p>If something on this site is hard to use, tell us
+    {% if store_contact_email %}at <a href="mailto:{{ store_contact_email }}">{{ store_contact_email }}</a>{% else %}through the operator of this installation{% endif %}.
+    Describe the page and the problem; we will answer and offer the content in another form when we can.</p>
+</article>
+{% endblock %}

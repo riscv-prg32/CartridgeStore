@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from html import escape
 import re
+import secrets
 from typing import Any
 
 
@@ -12,6 +13,10 @@ def _num(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _fmt(number: float) -> str:
+    return str(int(number)) if float(number).is_integer() else f"{number:.2f}"
 
 
 def _color(value: str) -> str:
@@ -63,9 +68,19 @@ def line_chart(
         f"{'M' if index == 0 else 'L'} {px(index):.2f} {py(point['y']):.2f}"
         for index, point in enumerate(points)
     )
+    chart_id = "chart-" + secrets.token_hex(4)
+    if series:
+        peak = max(series, key=lambda item: _num(item.get("y")))
+        summary = (
+            f"{len(series)} points from {series[0].get('x', '')} to {series[-1].get('x', '')}; "
+            f"highest {_fmt(_num(peak.get('y')))} at {peak.get('x', '')}."
+        )
+    else:
+        summary = "No data."
     parts = [
-        f'<svg viewBox="0 0 {width} {height}" role="img" aria-labelledby="chart-title" xmlns="http://www.w3.org/2000/svg">',
-        f"<title id=\"chart-title\">{escape(title)}</title>",
+        f'<svg viewBox="0 0 {width} {height}" role="img" aria-labelledby="{chart_id}-title {chart_id}-desc" xmlns="http://www.w3.org/2000/svg">',
+        f'<title id="{chart_id}-title">{escape(title)}</title>',
+        f'<desc id="{chart_id}-desc">{escape(summary)}</desc>',
         f'<rect width="{width}" height="{height}" fill="white"/>',
         f'<line x1="{pad_left}" y1="{pad_top}" x2="{pad_left}" y2="{height - pad_bottom}" stroke="#b8c2cc"/>',
         f'<line x1="{pad_left}" y1="{height - pad_bottom}" x2="{width - pad_right}" y2="{height - pad_bottom}" stroke="#b8c2cc"/>',
@@ -80,6 +95,13 @@ def line_chart(
     parts.extend(
         [
             f'<path d="{path}" fill="none" stroke="{_color(color)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+            # Markers keep short series (and a single point) visible.
+            "".join(
+                f'<circle cx="{px(index):.2f}" cy="{py(point["y"]):.2f}" r="4" fill="{_color(color)}"/>'
+                for index, point in enumerate(points)
+            )
+            if series and len(points) <= 60
+            else "",
             f'<text x="{pad_left}" y="{height - 8}" font-size="11" fill="#475569">{escape(x_label)}</text>',
             f'<text x="12" y="{pad_top}" font-size="11" fill="#475569">{escape(y_label)}</text>',
             "</svg>",
@@ -109,9 +131,12 @@ def bar_chart(
     max_value = max(values) if values else 1.0
     if max_value <= 0:
         max_value = 1.0
+    chart_id = "chart-" + secrets.token_hex(4)
+    summary = "; ".join(f"{label}: {_fmt(_num(value))}" for label, value in items[:20]) or "No data."
     parts = [
-        f'<svg viewBox="0 0 {width} {chart_h}" role="img" aria-labelledby="bar-title" xmlns="http://www.w3.org/2000/svg">',
-        f"<title id=\"bar-title\">{escape(title)}</title>",
+        f'<svg viewBox="0 0 {width} {chart_h}" role="img" aria-labelledby="{chart_id}-title {chart_id}-desc" xmlns="http://www.w3.org/2000/svg">',
+        f'<title id="{chart_id}-title">{escape(title)}</title>',
+        f'<desc id="{chart_id}-desc">{escape(summary)}</desc>',
         f'<rect width="{width}" height="{chart_h}" fill="white"/>',
     ]
     if not items:

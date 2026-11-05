@@ -172,9 +172,11 @@ def test_index_paginates_catalog(client) -> None:
 
     page = client.get("/?per_page=2&page=1")
     assert page.status_code == 200
-    assert "UI Game 0" in page.text
-    assert "UI Game 1" in page.text
-    assert "UI Game 2" not in page.text
+    # The featured shelf sits above the catalog; check the paginated grid only.
+    catalog = page.text.split('id="allTitle"', 1)[1]
+    assert "UI Game 0" in catalog
+    assert "UI Game 1" in catalog
+    assert "UI Game 2" not in catalog
     assert "Page 1 of 2" in page.text
     assert "page=2" in page.text
 

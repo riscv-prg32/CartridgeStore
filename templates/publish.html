@@ -5,41 +5,18 @@
 
 {% block content %}
 <section class="bundle-panel">
-  <h1>Upload Cartridge Package</h1>
+  <h1>Upload a cartridge package</h1>
+  <p class="lead">Upload a bundle made with <code>python3 -m prg32 store pack-bundle</code>. An editor reviews it before it appears in the catalog.</p>
   <form id="bundle-publish-form" method="post" action="/publish" enctype="multipart/form-data">
-    <label>Cartridge bundle (.zip)<input type="file" name="bundle" accept=".zip" required></label>
-    <button class="primary" type="submit">Upload for Review</button>
+    <label>Cartridge bundle (.zip)<input type="file" name="bundle" accept=".zip,application/zip" aria-describedby="bundleHelp" required></label>
+    <p class="field-help" id="bundleHelp">The ZIP holds <code>manifest.json</code>, the icon, one <code>.prg32</code> per architecture and,
+      optionally, a <code>preview.mp4</code> gameplay video shown on the cartridge page.</p>
+    <button class="primary" type="submit">Upload for review</button>
   </form>
   <div id="bundle-result" class="result-area" aria-live="polite"></div>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script>
-  document.getElementById("bundle-publish-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const result = document.getElementById("bundle-result");
-    result.textContent = "";
-    const response = await fetch("/api/publish/bundle", {
-      method: "POST",
-      body: new FormData(event.currentTarget),
-      headers: { "Accept": "application/json" }
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      result.textContent = data.error || "Upload failed";
-      result.className = "result-area error-text";
-      return;
-    }
-    const list = document.createElement("ul");
-    for (const item of data.submitted || []) {
-      const row = document.createElement("li");
-      row.textContent = `${item.architecture}: ${item.file}`;
-      list.appendChild(row);
-    }
-    result.className = "result-area success-text";
-    result.textContent = `Submission #${data.submission_id} is waiting for editor verification.`;
-    result.appendChild(list);
-  });
-</script>
+<script src="/static/js/publish.js" defer></script>
 {% endblock %}

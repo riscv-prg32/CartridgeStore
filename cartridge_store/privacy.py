@@ -8,11 +8,12 @@ import secrets
 from typing import Any
 
 import click
-from flask import Flask, Response, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, Response, flash, g, jsonify, redirect, render_template, request, session, url_for
 
 from . import sso
-from .auth import current_principal, login_required, recently_authenticated, role_at_least
+from .auth import ANONYMOUS, current_principal, login_required, recently_authenticated, role_at_least
 from .database import add_column_if_missing, get_db, init_schema_once
+from .logs import erase_actor, events_for_actor, log_event
 from .settings import get_setting
 from .store import GameStore
 from werkzeug.security import check_password_hash
@@ -93,6 +94,7 @@ def privacy_context() -> dict[str, Any]:
         "metrics_retention_days": _days("privacy_metrics_retention_days", 365),
         "registration_retention_days": _days("privacy_registration_retention_days", 7),
         "audit_retention_days": _days("privacy_audit_retention_days", 365),
+        "log_retention_days": _days("privacy_log_retention_days", 90),
         "representative": get_setting("privacy_representative", ""),
         "recipient_categories": get_setting("privacy_recipient_categories", ""),
         "transfer_details": get_setting("privacy_transfer_details", ""),
@@ -166,6 +168,7 @@ def export_user_data(user_id: int, store: GameStore) -> dict[str, Any]:
         "sso_queue": _rows_if_table(
             "SELECT created_at, attempts FROM sso_outbox WHERE email = ?", (str(user["email"]),)
         ),
+        "service_log_events": events_for_actor(user_id),
         "catalog_activity": store.personal_catalog_records(
             {str(user["username"]), str(user["email"]), str(user["public_handle"])}
         ),
@@ -202,6 +205,7 @@ def erase_user(user_id: int, store: GameStore, *, notify_sso: bool = True) -> bo
     )
     _execute_if_table("DELETE FROM sso_outbox WHERE email = ?", (email,))
     store.replace_publisher_identities({username, email, public_handle}, "deleted user")
+    erase_actor(user_id)
     db.execute("DELETE FROM registration_tokens WHERE email = ?", (email,))
     db.execute("DELETE FROM users WHERE id = ?", (user_id,))
     event_ref = secrets.token_urlsafe(18)
@@ -237,6 +241,11 @@ def apply_retention() -> dict[str, int]:
         (f"-{_days('privacy_registration_retention_days', 7)} days",),
     )
     counts["registration_tokens"] = max(cursor.rowcount, 0)
+    cursor = db.execute(
+        "DELETE FROM app_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)",
+        (f"-{_days('privacy_log_retention_days', 90)} days",),
+    )
+    counts["app_events"] = max(cursor.rowcount, 0)
     audit_days = _days("privacy_audit_retention_days", 365)
     db.execute("DELETE FROM privacy_events WHERE created_at < datetime('now', ?)", (f"-{audit_days} days",))
     db.execute("DELETE FROM privacy_rights_requests WHERE created_at < datetime('now', ?)", (f"-{audit_days} days",))
@@ -268,6 +277,7 @@ def register_privacy_routes(app: Flask, store: GameStore) -> None:
             app.extensions["privacy_catalog_migrated"] = True
         if session.get("privacy_notice_pending") and request.endpoint not in {
             "privacy_notice",
+            "accessibility_statement",
             "privacy_acknowledge",
             "privacy_acknowledge_post",
             "auth_logout",
@@ -288,8 +298,13 @@ def register_privacy_routes(app: Flask, store: GameStore) -> None:
         )
         if request.is_secure:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-        if request.path.startswith(("/account/", "/api/me", "/auth/tokens")):
+        private_paths = ("/account/", "/api/me", "/auth/", "/admin", "/api/admin", "/editor/", "/setup", "/users/")
+        signed_in = not request.path.startswith("/static/") and current_principal().authenticated
+        if request.path.startswith(private_paths) or (signed_in and response.mimetype == "text/html"):
+            # Pages with personal data must not stay in shared or browser caches.
             response.headers["Cache-Control"] = "no-store, private"
+        if signed_in:
+            response.headers["X-PRG32-Signed-In"] = "1"
         return response
 
     @app.get("/privacy")
@@ -347,6 +362,7 @@ def register_privacy_routes(app: Flask, store: GameStore) -> None:
         if not recently_authenticated():
             return jsonify({"ok": False, "error": "recent authentication required"}), 403
         payload = export_user_data(int(current_principal().id), store)
+        log_event("privacy", "data.exported", "Personal data export downloaded")
         response = Response(json.dumps(payload, indent=2, sort_keys=True) + "\n", mimetype="application/json")
         response.headers["Content-Disposition"] = "attachment; filename=cartridge-store-personal-data.json"
         return response
@@ -367,6 +383,9 @@ def register_privacy_routes(app: Flask, store: GameStore) -> None:
             erase_user(int(principal.id), store)
         except ValueError as exc:
             return render_template("account_privacy.html", privacy=privacy_context(), error=str(exc)), 400
+        # Logged without an actor: the account no longer exists.
+        g.prg32_principal = ANONYMOUS
+        log_event("privacy", "account.erased", "An account was erased by its owner", level="WARNING")
         session.clear()
         flash("Your account and linked personal data were erased.")
         return redirect(url_for("index"))
@@ -378,7 +397,9 @@ def register_privacy_routes(app: Flask, store: GameStore) -> None:
             return jsonify({"ok": False, "error": "administrator required"}), 403
         if not recently_authenticated():
             return jsonify({"ok": False, "error": "recent authentication required"}), 403
-        return jsonify({"ok": True, "deleted": apply_retention()})
+        deleted = apply_retention()
+        log_event("privacy", "retention.applied", "Retention cleanup: " + ", ".join(f"{k}={v}" for k, v in sorted(deleted.items())))
+        return jsonify({"ok": True, "deleted": deleted})
 
     @app.cli.command("privacy-cleanup")
     @click.option("--dry-run", is_flag=True, help="Report expired records without deleting them.")
@@ -430,6 +451,7 @@ def retention_due_counts() -> dict[str, int]:
         "download_events": ("SELECT COUNT(*) AS count FROM download_events WHERE downloaded_at < datetime('now', ?)", _days("privacy_download_retention_days", 90)),
         "runs": ("SELECT COUNT(*) AS count FROM runs WHERE created_at < strftime('%s', 'now', ?)", _days("privacy_metrics_retention_days", 365)),
         "registration_tokens": ("SELECT COUNT(*) AS count FROM registration_tokens WHERE created_at < datetime('now', ?)", _days("privacy_registration_retention_days", 7)),
+        "app_events": ("SELECT COUNT(*) AS count FROM app_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)", _days("privacy_log_retention_days", 90)),
     }
     return {
         name: int(db.execute(sql, (f"-{days} days",)).fetchone()["count"])
@@ -454,6 +476,7 @@ def _migrate_denormalized_identities(db: Any) -> None:
 
 def _initialize_cli_schemas() -> None:
     from .auth import init_auth_db
+    from .logs import init_logs_db
     from .metrics import init_metrics_db
     from .review import init_review_db
     from .scores import init_scores_db
@@ -470,6 +493,7 @@ def _initialize_cli_schemas() -> None:
         init_review_db,
         init_sso_db,
         init_privacy_db,
+        init_logs_db,
     ):
         initializer()
 

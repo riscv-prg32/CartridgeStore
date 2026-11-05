@@ -15,6 +15,10 @@ storage mounted outside the container or process directory.
 | `PRG32_METRICS_DB` | unset | Legacy metrics DB fallback |
 | `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
 | `PRG32_MP_MAX_PEERS` | `8` | WebSocket peers per multiplayer room |
+| `PRG32_MP_DEVICE_ID_SECRET` | derived from `SECRET_KEY` | Key for multiplayer device pseudonyms; keep it stable so a console keeps its public ID |
+| `PRG32_MP_MAX_MESSAGE_BYTES` | `1024` | Largest multiplayer message |
+| `PRG32_MP_MAX_RATE` | `40` | Multiplayer messages per second per connection before the socket is closed |
+| `PRG32_MP_IDLE_TIMEOUT` | `15` | Seconds of silence before a multiplayer socket is closed |
 | `PRG32_THREADS` | `128` | Gunicorn threads; each open multiplayer WebSocket holds one |
 | `PRG32_BIND` | `0.0.0.0:5080` | Gunicorn bind address |
 | `PRG32_USERS` | unset | Legacy `name:role:token` compatibility tokens |

@@ -745,7 +745,11 @@ def _send_registration_email(email: str, link: str) -> None:
         password = os.environ.get("PRG32_SMTP_PASSWORD", "")
         tls_default = "true"
     if not host:
-        current_app.logger.warning("Registration link for %s: %s", email, link)
+        # Printed for the operator only: the link is a secret and the address
+        # personal data, so the admin log never stores this record.
+        current_app.logger.warning(
+            "Registration link for %s: %s", email, link, extra={"prg32_private": True}
+        )
         return
     use_tls = os.environ.get("PRG32_SMTP_TLS", tls_default).lower() not in {"0", "false", "no"}
 
@@ -941,6 +945,10 @@ def register_auth_routes(app: Flask) -> None:
         password = request.form.get("password", "")
         principal = authenticate_local_user(username, password)
         if not principal.authenticated:
+            from ..logs import log_event
+
+            # The attempted name is not stored: it may be a mistyped password.
+            log_event("auth", "login.failed", "Local sign-in failed", level="WARNING", status=401)
             if _wants_json():
                 return jsonify({"ok": False, "error": "invalid username or password"}), 401
             return render_template("auth_login.html", error="Invalid username or password."), 401
@@ -953,6 +961,10 @@ def register_auth_routes(app: Flask) -> None:
         session["user_id"] = principal.id
         session["role"] = principal.role
         session["authenticated_at"] = time.time()
+        from ..logs import log_event
+
+        g.prg32_principal = principal  # attribute the event to the new session
+        log_event("auth", "login.succeeded", "Local sign-in")
         if not current_app.config.get("TESTING"):
             from ..privacy import PRIVACY_NOTICE_VERSION
 
@@ -970,6 +982,9 @@ def register_auth_routes(app: Flask) -> None:
     @app.post("/auth/logout")
     @login_required
     def auth_logout():
+        from ..logs import log_event
+
+        log_event("auth", "logout", "Signed out")
         session.clear()
         if _wants_json():
             return jsonify({"ok": True})

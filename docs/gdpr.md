@@ -49,6 +49,27 @@ advertising or non-essential tracking cookies. It stores a keyed HMAC-SHA-256
 IP-derived value—not the raw address—for aggregate download telemetry; this remains
 personal data when it can relate to a person and is therefore retention-bound.
 
+Download events keep only a coarse client class (`prg32`, `browser`, `tool`,
+`other`) instead of the User-Agent string; older raw values are converted when
+the Store starts.
+
+The multiplayer relay holds rooms in memory only. A console's `device_id` is
+replaced by a keyed HMAC pseudonym before anything else sees it; the raw value
+is never stored, logged or relayed, and snapshots are not retained.
+
+The administrator event log (`/admin/logs`) records security and
+administration events. It is minimised: failed sign-ins do not store the name
+typed, email addresses and `token=`/`password=` values are redacted from every
+message, the actor is the public handle, and the registration link printed when
+SMTP is not configured never enters the log. Erasing an account turns its
+events' actor into `deleted user`; an account's own events are part of its data
+export.
+
+The service worker caches only static assets and public pages fetched while
+signed out. Pages for signed-in users and every admin, account, review and
+setup page are sent with `Cache-Control: no-store, private`, and signing out
+clears the offline cache.
+
 External LDAP, OIDC, SAML, SMTP, reverse proxies, hosting, backup systems, and a
 linked Construction Kit expand the processing boundary. The operator must
 inventory and configure each one independently.
@@ -88,6 +109,7 @@ Defaults are intentionally finite:
 | Metrics runs and samples | 365 days |
 | Unused/expired registration records | 7 days |
 | Random-reference rights/audit events | 365 days |
+| Administrator event log | 90 days |
 
 Cleanup is deliberately outside request handling. Schedule the idempotent CLI
 command at least daily:

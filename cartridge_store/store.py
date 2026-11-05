@@ -18,8 +18,16 @@ SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")
 SAFE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 
 
+PREVIEW_FILENAME = "preview.mp4"
+
+
 class StoreError(ValueError):
     pass
+
+
+def is_mp4(data: bytes) -> bool:
+    """Recognise an ISO base media (MP4) file by its leading ``ftyp`` box."""
+    return len(data) >= 12 and data[4:8] == b"ftyp"
 
 
 def version_sort_key(version: str) -> tuple[tuple[int, int | str], ...]:
@@ -49,6 +57,12 @@ def safe_game_id(game_id: str) -> str:
 
 def safe_version(version: str) -> str:
     return _check_safe(version, SAFE_VERSION_RE, "version")
+
+
+def _public_preview(record: Any) -> dict[str, Any] | None:
+    if not isinstance(record, dict):
+        return None
+    return {key: record.get(key) for key in ("size", "sha256", "mime", "updated_at")}
 
 
 def _contains_personal_value(value: Any, needles: set[str]) -> bool:
@@ -254,6 +268,56 @@ class GameStore:
             games = [game for game in games if self._matches_query(game, needle)]
         return sorted(games, key=lambda item: item["title"].lower())
 
+    def featured_games(self, limit: int = 6) -> list[dict[str, Any]]:
+        """Return the most recently published or updated cartridges.
+
+        Each record gets a ``featured_reason``: ``new`` for a cartridge whose
+        first version is the latest activity, ``updated`` otherwise.
+        """
+        games = self.list_games()
+        games.sort(key=lambda item: str(item.get("updated_at") or ""), reverse=True)
+        featured = []
+        for game in games[: max(limit, 0)]:
+            game = dict(game)
+            game["featured_reason"] = "new" if len(game["versions"]) == 1 else "updated"
+            featured.append(game)
+        return featured
+
+    def attach_preview(self, game_id: str, version: str, data: bytes) -> dict[str, Any]:
+        """Store a version's preview video beside its cartridge variants."""
+        if not is_mp4(data):
+            raise StoreError("preview.mp4 must be an MP4 video")
+        with self._mutation_lock:
+            game_id = safe_game_id(game_id)
+            version = safe_version(version)
+            index = self.load_index()
+            game = index.get("games", {}).get(game_id)
+            if not isinstance(game, dict) or version not in game.get("versions", {}):
+                raise StoreError("version not found")
+            path = self.cartridge_dir / game_id / version / PREVIEW_FILENAME
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            game["versions"][version]["preview"] = {
+                "filename": path.relative_to(self.data_dir).as_posix(),
+                "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "mime": "video/mp4",
+                "updated_at": utc_now(),
+            }
+            self.save_index(index)
+            return game["versions"][version]["preview"]
+
+    def preview_path(self, game_id: str, version: str | None = None) -> tuple[dict[str, Any], Path]:
+        game = self.public_game(game_id, version=version)
+        index = self.load_index()
+        record = index["games"][game["id"]]["versions"][game["selected_version"]].get("preview")
+        if not isinstance(record, dict):
+            raise StoreError("preview not found")
+        path = (self.data_dir / str(record.get("filename", ""))).resolve()
+        if self.data_dir.resolve() not in path.parents or not path.is_file():
+            raise StoreError("preview not found")
+        return game, path
+
     def public_game(self, game_id: str, version: str | None = None) -> dict[str, Any]:
         index = self.load_index()
         game = index.get("games", {}).get(safe_game_id(game_id))
@@ -343,8 +407,10 @@ class GameStore:
         else:
             for variant in list(architectures.values()):
                 self._remove_variant_file(variant)
+            self._remove_variant_file(version_rec.get("preview") or {})
             versions.pop(version, None)
         if not architectures or not version_rec.get("architectures"):
+            self._remove_variant_file(version_rec.get("preview") or {})
             versions.pop(version, None)
         if not versions:
             games.pop(game_id, None)
@@ -384,6 +450,9 @@ class GameStore:
             "variants": architectures,
             "publisher": version_rec.get("published_by") or game.get("publisher", ""),
             "updated_at": game.get("updated_at"),
+            "created_at": game.get("created_at"),
+            "has_preview": isinstance(version_rec.get("preview"), dict),
+            "preview": _public_preview(version_rec.get("preview")),
         }
 
     def _matches_query(self, game: dict[str, Any], needle: str) -> bool:

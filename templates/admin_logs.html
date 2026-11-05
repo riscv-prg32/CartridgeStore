@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Event log - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>Event log</h1>
+  <p class="lead">Sign-ins, account and catalog changes, reviews, backups, privacy requests, and server warnings and errors.
+    Messages never contain email addresses or secrets; events are deleted after the retention period set in
+    <a href="/setup">Setup</a>.</p>
+  <ul class="stat-tiles" aria-label="Events in the last 7 days">
+    {% for level in ["INFO", "WARNING", "ERROR", "CRITICAL"] %}
+    <li class="stat-tile level-{{ level | lower }}"><span class="stat-value">{{ counts[level] }}</span><span class="stat-label">{{ level | lower }} (7 days)</span></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="toolbar">
+  <form class="filter-form" method="get" action="/admin/logs" aria-label="Filter events">
+    <label>Minimum level
+      <select name="level">
+        {% for level in levels %}<option value="{{ level }}" {% if query.level == level %}selected{% endif %}>{{ level | lower }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Category
+      <select name="category">
+        <option value="">all</option>
+        {% for category in categories %}<option value="{{ category }}" {% if query.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Text<input name="q" type="search" value="{{ query.q }}"></label>
+    <label>From<input name="since" type="date" value="{{ query.since }}"></label>
+    <label>To<input name="until" type="date" value="{{ query.until }}"></label>
+    <div class="filter-actions">
+      <button type="submit">Apply</button>
+      <a class="button secondary" href="/admin/logs.csv?{{ request.query_string.decode() }}">Export CSV</a>
+    </div>
+  </form>
+</section>
+
+<section class="table-panel" aria-labelledby="eventsTitle">
+  <h2 id="eventsTitle">Stored events <span class="count">({{ total }})</span></h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="eventsTitle">
+    <table class="log-table">
+      <thead>
+        <tr><th scope="col">Time (UTC)</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Event</th><th scope="col">Message</th><th scope="col">Actor</th><th scope="col">Request</th></tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td><time datetime="{{ event.created_at }}">{{ event.created_at | replace("T", " ") | replace("Z", "") }}</time></td>
+          <td><span class="level level-{{ event.level | lower }}">{{ event.level | lower }}</span></td>
+          <td>{{ event.category }}</td>
+          <td><code>{{ event.event }}</code></td>
+          <td>{{ event.message }}</td>
+          <td>{{ event.actor or "—" }}</td>
+          <td>{% if event.path %}<code>{{ event.method }} {{ event.path }}</code>{% if event.status %} → {{ event.status }}{% endif %}{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No events match these filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <nav class="pagination" aria-label="Event log pages">
+    <p>Page {{ page }} of {{ pages }}</p>
+    <div class="pagination-links">
+      {% set args = request.args.to_dict() %}
+      {% if page > 1 %}{% set _ = args.update({"page": page - 1}) %}<a class="button secondary" href="{{ url_for('admin_logs', **args) }}" rel="prev">Newer</a>{% endif %}
+      {% if page < pages %}{% set _ = args.update({"page": page + 1}) %}<a class="button secondary" href="{{ url_for('admin_logs', **args) }}" rel="next">Older</a>{% endif %}
+    </div>
+  </nav>
+  {% endif %}
+</section>
+
+<section class="table-panel" aria-labelledby="processTitle">
+  <h2 id="processTitle">Process log</h2>
+  <p class="section-note">The latest records of this server process, kept in memory and cleared on restart.</p>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="processTitle">
+    <table class="log-table">
+      <thead><tr><th scope="col">Time (UTC)</th><th scope="col">Level</th><th scope="col">Source</th><th scope="col">Message</th></tr></thead>
+      <tbody>
+        {% for record in process_log %}
+        <tr>
+          <td><time datetime="{{ record.created_at }}">{{ record.created_at | replace("T", " ") | replace("Z", "") }}</time></td>
+          <td><span class="level level-{{ record.level | lower }}">{{ record.level | lower }}</span></td>
+          <td><code>{{ record.logger }}</code></td>
+          <td>{{ record.message }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No process records at this level.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

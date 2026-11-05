@@ -2,58 +2,107 @@
 
 {% block title %}{{ store_name }}{% endblock %}
 
+{% macro card_media(game, large=False) -%}
+  {%- set arch = game.architectures[0] if game.architectures else None -%}
+  {%- if large and arch and game.variants[arch].has_screenshot -%}
+  <img class="card-shot" src="/api/games/{{ game.id }}/screenshot?architecture={{ arch }}" alt="" loading="lazy">
+  {%- else -%}
+  <img class="card-icon" src="/api/games/{{ game.id }}/icon" alt="" loading="lazy">
+  {%- endif -%}
+{%- endmacro %}
+
 {% block content %}
-<section class="toolbar">
-  <form class="search" method="get" action="/">
-    <input name="q" value="{{ q }}" placeholder="Search title, author, tag">
+<section class="hero" aria-labelledby="catalogTitle">
+  <div>
+    <h1 id="catalogTitle">{{ store_name }}</h1>
+    <p class="lead">{{ store_tagline or "Browse, download and install cartridges for the PRG32 console." }}</p>
+  </div>
+  <form class="search" method="get" action="/" role="search" aria-label="Search cartridges">
+    <label class="search-field">
+      <span>Search</span>
+      <input name="q" type="search" value="{{ q }}" placeholder="Title, author or tag" autocomplete="off">
+    </label>
     <label class="per-page-control">
       <span>Per page</span>
-      <input name="per_page" type="number" min="1" max="100" value="{{ pagination.per_page }}">
+      <input name="per_page" type="number" min="1" max="100" value="{{ pagination.per_page }}" inputmode="numeric">
     </label>
     <button type="submit">Search</button>
   </form>
 </section>
 
-<section class="game-grid" aria-label="Games">
-  {% for game in games %}
-  <article class="game-card">
-    <a class="icon-link" href="/games/{{ game.id }}">
-      <img src="/api/games/{{ game.id }}/icon" alt="">
-    </a>
-    <div class="game-card-body">
-      <h2><a href="/games/{{ game.id }}">{{ game.title }}</a></h2>
-      <p>{{ game.summary }}</p>
-      <div class="meta-row">
-        <span>v{{ game.latest_version }}</span>
-        <span>{{ game.architectures | join(", ") }}</span>
+{% if featured %}
+<section class="featured" aria-labelledby="featuredTitle">
+  <div class="section-head">
+    <h2 id="featuredTitle">Featured: latest releases</h2>
+    <p class="section-note">New cartridges and the most recent updates.</p>
+  </div>
+  <ul class="featured-grid">
+    {% for game in featured %}
+    <li class="featured-card">
+      <div class="featured-media">{{ card_media(game, large=True) }}</div>
+      <div class="featured-body">
+        <p class="badges">
+          {% if game.featured_reason == "new" %}<span class="badge badge-new">New</span>{% else %}<span class="badge badge-updated">Updated</span>{% endif %}
+          {% if game.has_preview %}<span class="badge">Video</span>{% endif %}
+        </p>
+        <h3><a class="card-link" href="/games/{{ game.id }}">{{ game.title }}</a></h3>
+        <p class="card-summary">{{ game.summary }}</p>
+        <p class="meta-row">
+          <span>v{{ game.latest_version }}</span>
+          {% if game.updated_at %}<span><time datetime="{{ game.updated_at }}">{{ game.updated_at[:10] }}</time></span>{% endif %}
+        </p>
       </div>
-      <div class="tag-row">
-        {% for tag in game.tags %}
-        <span>{{ tag }}</span>
-        {% endfor %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section aria-labelledby="allTitle">
+  <div class="section-head">
+    <h2 id="allTitle">{% if q %}Results for “{{ q }}”{% else %}All cartridges{% endif %}</h2>
+    <p class="section-note" role="status">{{ pagination.total }} cartridge{{ "" if pagination.total == 1 else "s" }}</p>
+  </div>
+  <ul class="game-grid">
+    {% for game in games %}
+    <li class="game-card">
+      <div class="icon-cell">{{ card_media(game) }}</div>
+      <div class="game-card-body">
+        <h3><a class="card-link" href="/games/{{ game.id }}">{{ game.title }}</a></h3>
+        <p class="card-summary">{{ game.summary }}</p>
+        <p class="meta-row">
+          <span>v{{ game.latest_version }}</span>
+          <span>{{ game.architectures | join(", ") }}</span>
+          {% if game.has_preview %}<span>Video</span>{% endif %}
+        </p>
+        {% if game.tags %}
+        <p class="tag-row"><span class="visually-hidden">Tags:</span>
+          {% for tag in game.tags %}<a class="tag" href="{{ url_for('index', q=tag) }}">{{ tag }}</a>{% endfor %}
+        </p>
+        {% endif %}
       </div>
-    </div>
-  </article>
-  {% else %}
-  <p class="empty">No cartridges published yet.</p>
-  {% endfor %}
+    </li>
+    {% else %}
+    <li class="empty">{% if q %}No cartridges match “{{ q }}”. <a href="/">Show all cartridges</a>.{% else %}No cartridges published yet.{% endif %}</li>
+    {% endfor %}
+  </ul>
 </section>
 
-{% if pagination.total > 0 %}
+{% if pagination.total > 0 and pagination.pages > 1 %}
 <nav class="pagination" aria-label="Catalog pages">
   <p>
-    Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}-{{ [pagination.page * pagination.per_page, pagination.total] | min }}
+    Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }}–{{ [pagination.page * pagination.per_page, pagination.total] | min }}
     of {{ pagination.total }} cartridges
   </p>
   <div class="pagination-links">
     {% if pagination.has_prev %}
-    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.prev_page) }}">Previous</a>
+    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.prev_page) }}" rel="prev">Previous</a>
     {% else %}
     <span class="button secondary disabled" aria-disabled="true">Previous</span>
     {% endif %}
-    <span class="page-count">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    <span class="page-count" aria-current="page">Page {{ pagination.page }} of {{ pagination.pages }}</span>
     {% if pagination.has_next %}
-    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.next_page) }}">Next</a>
+    <a class="button secondary" href="{{ url_for('index', q=q, per_page=pagination.per_page, page=pagination.next_page) }}" rel="next">Next</a>
     {% else %}
     <span class="button secondary disabled" aria-disabled="true">Next</span>
     {% endif %}

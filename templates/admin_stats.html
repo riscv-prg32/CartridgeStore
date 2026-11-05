@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - {{ store_name }}{% endblock %}
+
+{% macro tile(value, label) -%}
+<li class="stat-tile"><span class="stat-value">{{ value }}</span><span class="stat-label">{{ label }}</span></li>
+{%- endmacro %}
+
+{% macro size(bytes) -%}
+{%- if bytes >= 1048576 -%}{{ (bytes / 1048576) | round(1) }} MiB{%- else -%}{{ (bytes / 1024) | round(1) }} KiB{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<section class="page-head">
+  <h1>Statistics</h1>
+  <p class="lead">Operational figures for administrators. Counts only: no figure here identifies a person.
+    The public <a href="/stats">download statistics</a> stay available to everyone;
+    the same data is available as JSON from <a href="/api/admin/stats"><code>/api/admin/stats</code></a>.</p>
+</section>
+
+<section aria-labelledby="catalogStats">
+  <h2 id="catalogStats">Catalog</h2>
+  <ul class="stat-tiles">
+    {{ tile(stats.catalog.games, "cartridges") }}
+    {{ tile(stats.catalog.versions, "versions") }}
+    {{ tile(stats.catalog.variants, "architecture builds") }}
+    {{ tile(stats.catalog.previews, "preview videos") }}
+    {{ tile(size(stats.catalog.storage_bytes), "published storage") }}
+    {{ tile(stats.submissions.get("pending", 0), "pending reviews") }}
+  </ul>
+</section>
+
+<section aria-labelledby="downloadStats">
+  <h2 id="downloadStats">Downloads</h2>
+  <ul class="stat-tiles">
+    {{ tile(stats.downloads.total, "total (within retention)") }}
+    {{ tile(stats.downloads.last_7_days, "last 7 days") }}
+    {{ tile(stats.downloads.last_30_days, "last 30 days") }}
+    {{ tile(stats.downloads.signed_in, "by signed-in users") }}
+  </ul>
+  <div class="chart-grid">
+    <figure class="chart-panel"><h3>Downloads per day</h3>{{ trend_chart | safe }}</figure>
+    <figure class="chart-panel"><h3>Downloads by client</h3>{{ client_chart | safe }}
+      <figcaption>Client classes: <strong>prg32</strong> consoles and PRG32 tools, <strong>browser</strong>, <strong>tool</strong> (curl, scripts), <strong>other</strong>.</figcaption>
+    </figure>
+  </div>
+  <div class="table-panel">
+    <h3>Most downloaded</h3>
+    <table>
+      <thead><tr><th scope="col">Cartridge</th><th scope="col">Downloads</th><th scope="col">Last published</th></tr></thead>
+      <tbody>
+        {% for game in summary.top_games %}
+        <tr><td><a href="/games/{{ game.id }}">{{ game.title }}</a></td><td>{{ game.downloads }}</td><td>{{ (game.last_published or "")[:10] }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No downloads yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="userStats">
+  <h2 id="userStats">Accounts</h2>
+  <ul class="stat-tiles">
+    {{ tile(stats.users.total, "accounts") }}
+    {{ tile(stats.users.new_30_days, "new in 30 days") }}
+    {{ tile(stats.users.active_30_days, "signed in within 30 days") }}
+  </ul>
+  <div class="chart-grid">
+    <figure class="chart-panel"><h3>Accounts by role</h3>{{ role_chart | safe }}</figure>
+    <figure class="chart-panel"><h3>Submissions by status</h3>{{ submission_chart | safe }}</figure>
+  </div>
+  <table>
+    <caption>Accounts by sign-in provider</caption>
+    <thead><tr><th scope="col">Provider</th><th scope="col">Accounts</th></tr></thead>
+    <tbody>
+      {% for provider, count in stats.users.by_provider %}<tr><td>{{ provider }}</td><td>{{ count }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section aria-labelledby="playStats">
+  <h2 id="playStats">Play and telemetry</h2>
+  <ul class="stat-tiles">
+    {{ tile(stats.scores.total, "scores") }}
+    {{ tile(stats.scores.games, "games with scores") }}
+    {{ tile(stats.runs.total, "metrics runs") }}
+    {{ tile(stats.runs.active_last_7_days, "runs in 7 days") }}
+    {{ tile(stats.multiplayer.get("players", 0), "players online now") }}
+    {{ tile(stats.multiplayer.get("room_count", 0), "multiplayer rooms now") }}
+  </ul>
+</section>
+
+<section aria-labelledby="healthStats">
+  <h2 id="healthStats">Service health (7 days)</h2>
+  <ul class="stat-tiles">
+    {% for level in ["WARNING", "ERROR", "CRITICAL"] %}
+    {{ tile(stats.log_levels_7_days[level], level | lower ~ " events") }}
+    {% endfor %}
+  </ul>
+  <p><a href="/admin/logs?level=WARNING">Open the event log</a></p>
+</section>
+{% endblock %}

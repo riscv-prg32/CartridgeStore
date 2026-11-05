@@ -114,6 +114,13 @@ registration links are logged for development.
 - `/admin/cartridges` lets admins and editors edit descriptive cartridge
   metadata or delete variants/versions.
 - `/admin/backup` exports and restores full backups.
+- `/admin/stats` shows catalog size and storage, downloads by period and client
+  class, accounts by role and provider, submissions, scores, metrics runs,
+  live multiplayer rooms and the number of warnings and errors. The same data
+  is available as JSON from `/api/admin/stats`.
+- `/admin/logs` is the event log (see [Logs](#logs)).
+
+The header groups these pages in an **Admin** menu.
 
 ## Access Tokens
 
@@ -123,6 +130,23 @@ and rotate them when a shared classroom token is exposed. Editor verification
 uses database users in the `editors` group.
 
 ## Logs
+
+Administrators read the logs at `/admin/logs`:
+
+- **Stored events**: sign-ins and failed sign-ins, user, group, setting,
+  theme and backup changes, cartridge edits and deletions, submissions,
+  verifications and rejections, data exports and erasures, retention cleanup,
+  every response with a 5xx status, and warnings or errors raised while a
+  request was handled. Filter by minimum level, category, text and date;
+  export the selection as CSV from `/admin/logs.csv` or read it as JSON from
+  `/api/admin/logs`.
+- **Process log**: the latest 500 records of the server process (for example
+  mDNS or Construction Kit sync warnings), kept in memory until restart.
+
+Stored events are deleted after the **Service event log retention** set in
+Setup (90 days by default) by `flask --app app:app privacy-cleanup`.
+
+The container output still holds the full server log:
 
 ```bash
 docker compose logs -f

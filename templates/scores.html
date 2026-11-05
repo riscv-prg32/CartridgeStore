@@ -4,15 +4,17 @@
 
 {% block content %}
 <section class="toolbar">
-  <form class="search" method="get" action="/scores">
-    <input name="game" value="{{ game }}" placeholder="Game id">
-    <input name="player" value="{{ player }}" placeholder="Player name">
+  <form class="filter-form" method="get" action="/scores" aria-label="Filter scores">
+    <label>Game ID<input name="game" value="{{ game }}"></label>
+    <label>Player<input name="player" value="{{ player }}"></label>
+    <label>Show
     <select name="limit">
       {% for option in [20, 50, 100] %}
       <option value="{{ option }}" {% if limit == option %}selected{% endif %}>{{ option }} scores</option>
       {% endfor %}
     </select>
-    <button type="submit">Apply</button>
+    </label>
+    <div class="filter-actions"><button type="submit">Apply</button></div>
   </form>
 </section>
 
@@ -21,11 +23,11 @@
   <table>
     <thead>
       <tr>
-        <th>Rank</th>
-        <th>Game</th>
-        <th>Player</th>
-        <th>Score</th>
-        <th>Submitted By</th>
+        <th scope="col">Rank</th>
+        <th scope="col">Game</th>
+        <th scope="col">Player</th>
+        <th scope="col">Score</th>
+        <th scope="col">Submitted by</th>
       </tr>
     </thead>
     <tbody>

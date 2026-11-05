@@ -4,23 +4,26 @@
 
 {% block content %}
 <section class="toolbar">
-  <form class="search" method="get" action="/stats">
-    <input name="since" value="{{ query.since }}" placeholder="Since YYYY-MM-DD">
-    <input name="until" value="{{ query.until }}" placeholder="Until YYYY-MM-DD">
+  <form class="filter-form" method="get" action="/stats" aria-label="Filter statistics">
+    <label>From<input name="since" type="date" value="{{ query.since }}"></label>
+    <label>To<input name="until" type="date" value="{{ query.until }}"></label>
+    <label>Group by
     <select name="granularity">
       <option value="day" {% if query.granularity == "day" %}selected{% endif %}>day</option>
       <option value="week" {% if query.granularity == "week" %}selected{% endif %}>week</option>
       <option value="month" {% if query.granularity == "month" %}selected{% endif %}>month</option>
     </select>
-    <button type="submit">Apply</button>
+    </label>
+    <div class="filter-actions"><button type="submit">Apply</button></div>
   </form>
 </section>
 
+<h1>Statistics</h1>
 <section class="chart-panel">
-  <h1>Downloads</h1>
+  <h2>Downloads</h2>
   {{ trend_chart | safe }}
   <table>
-    <thead><tr><th>Date</th><th>Downloads</th></tr></thead>
+    <thead><tr><th scope="col">Date</th><th scope="col">Downloads</th></tr></thead>
     <tbody>
       {% for item in summary.series %}
       <tr><td>{{ item.date }}</td><td>{{ item.downloads }}</td></tr>
@@ -33,12 +36,12 @@
 
 <section class="split">
   <div>
-    <h2>Top Games</h2>
+    <h2>Top games</h2>
     <table>
-      <thead><tr><th>Title</th><th>Downloads</th><th>Last Published</th></tr></thead>
+      <thead><tr><th scope="col">Title</th><th scope="col">Downloads</th><th scope="col">Last published</th></tr></thead>
       <tbody>
         {% for game in summary.top_games %}
-        <tr><td>{{ game.title }}</td><td>{{ game.downloads }}</td><td>{{ game.last_published }}</td></tr>
+        <tr><td><a href="/games/{{ game.id }}">{{ game.title }}</a></td><td>{{ game.downloads }}</td><td>{{ (game.last_published or "")[:10] }}</td></tr>
         {% else %}
         <tr><td colspan="3">No downloads yet.</td></tr>
         {% endfor %}
@@ -46,8 +49,8 @@
     </table>
   </div>
   <div>
-    <h2>Active Runs</h2>
-    <p class="stat-number">{{ active_runs_last_week }}</p>
+    <h2>Activity</h2>
+    <p><span class="stat-number">{{ active_runs_last_week }}</span> metrics runs in the last 7 days</p>
     {{ arch_chart | safe }}
   </div>
 </section>

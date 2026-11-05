@@ -278,11 +278,15 @@ def test_multiplayer_hub_relays_same_signature() -> None:
         },
     )
 
-    assert first_messages[0] == {"type": "welcome", "player_id": 11}
-    assert second_messages[0] == {"type": "welcome", "player_id": 22}
+    assert first_messages[0]["type"] == "welcome"
+    assert first_messages[0]["player_id"] == 11
+    assert first_messages[0]["protocol"] == "prg32-multiplayer-1.0"
+    assert second_messages[0]["player_id"] == 22
     assert second_messages[-1] == {
         "type": "peer",
         "player_id": 11,
+        "device_id": first.device_id,
+        "platform": "unknown",
         "x": 120,
         "y": 80,
         "sprite": 1,
@@ -388,9 +392,11 @@ def test_multiplayer_requires_player_role_when_configured(tmp_path) -> None:
 
     hub.receive(peer, {"type": "join", "signature": "pong-v1"})
     assert messages[-1]["error"] == "player role required"
+    assert messages[-1]["code"] == "unauthorized"
 
     hub.receive(peer, {"type": "join", "signature": "pong-v1", "token": "board-secret"})
-    assert messages[-1] == {"type": "welcome", "player_id": 1}
+    assert messages[-1]["type"] == "welcome"
+    assert 1 <= messages[-1]["player_id"] <= 0xFFFFFFFF
 
 
 def test_discovery_lists_unified_services_and_roles(tmp_path) -> None:
@@ -773,4 +779,4 @@ def test_cartridge_page_score_chart_and_download_count(tmp_path) -> None:
 
     assert page.status_code == 200
     assert "<svg" in page.text
-    assert "1 downloads" in page.text
+    assert "<dt>Downloads</dt><dd>1</dd>" in page.text

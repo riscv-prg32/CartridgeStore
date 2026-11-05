@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="{{ theme_primary_color }}">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="description" content="{{ store_tagline or 'Browse, download and install PRG32 cartridges.' }}">
   <link rel="manifest" href="/manifest.webmanifest">
   {% if theme_favicon_url %}<link rel="icon" href="{{ theme_favicon_url }}">{% endif %}
   <link rel="stylesheet" href="/static/style.css">
@@ -19,45 +20,66 @@
   </style>
 </head>
 <body>
+  {%- macro nav_link(href, label, prefix=None) -%}
+  {%- set active = request.path == href or (prefix and request.path.startswith(prefix)) -%}
+  <a href="{{ href }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+  {%- endmacro %}
+  <a class="skip-link" href="#main">Skip to main content</a>
   <header class="topbar">
     <a class="brand" href="/">
       {% if theme_logo_url %}
-      <img src="{{ theme_logo_url }}" alt="{{ store_name }}" class="site-logo">
+      <img src="{{ theme_logo_url }}" alt="" class="site-logo">
       {% else %}
-      <img src="{{ url_for('static', filename='img/default_logo.svg') }}" alt="{{ store_name }}" class="site-logo">
+      <img src="{{ url_for('static', filename='img/default_logo.svg') }}" alt="" class="site-logo">
       {% endif %}
       <span class="site-copy">
         <span class="site-title">{{ store_name }}</span>
         {% if store_tagline %}<span class="site-tagline">{{ store_tagline }}</span>{% endif %}
       </span>
     </a>
-    <nav>
-      <a href="/">Store</a>
-      <a href="/scores">Scores</a>
-      <a href="/stats">Stats</a>
-      <a href="/publish">Publish</a>
-      {% if current_user.authenticated and "editors" in current_user.groups %}
-      <a href="/editor/submissions">Review</a>
-      {% endif %}
-      <a href="/api/games">API</a>
-      {% if current_user.authenticated and current_user.role == "admin" %}
-      <a href="/setup">Setup</a>
-      <a href="/admin/users">Users</a>
-      <a href="/admin/groups">Groups</a>
-      <a href="/admin/backup">Backup</a>
-      <a href="/admin/privacy">Privacy readiness</a>
-      {% endif %}
-      {% if current_user.authenticated and (current_user.role == "admin" or "editors" in current_user.groups) %}
-      <a href="/admin/cartridges">Cartridges</a>
+    <nav class="main-nav" aria-label="Main">
+      <ul class="nav-list">
+        <li>{{ nav_link("/", "Store", "/games/") }}</li>
+        <li>{{ nav_link("/scores", "Scores") }}</li>
+        <li>{{ nav_link("/stats", "Stats") }}</li>
+        <li>{{ nav_link("/publish", "Publish") }}</li>
+        {% if current_user.authenticated and "editors" in current_user.groups %}
+        <li>{{ nav_link("/editor/submissions", "Review", "/editor/") }}</li>
+        {% endif %}
+      </ul>
+      {% set is_admin = current_user.authenticated and current_user.role == "admin" %}
+      {% set is_editor = current_user.authenticated and "editors" in current_user.groups %}
+      {% if is_admin or is_editor %}
+      <details class="nav-menu">
+        <summary>Admin</summary>
+        <ul>
+          {% if is_admin %}
+          <li>{{ nav_link("/admin/stats", "Statistics") }}</li>
+          <li>{{ nav_link("/admin/logs", "Event log") }}</li>
+          <li>{{ nav_link("/admin/users", "Users") }}</li>
+          <li>{{ nav_link("/admin/groups", "Groups") }}</li>
+          {% endif %}
+          <li>{{ nav_link("/admin/cartridges", "Cartridges") }}</li>
+          {% if is_admin %}
+          <li>{{ nav_link("/setup", "Setup") }}</li>
+          <li>{{ nav_link("/admin/backup", "Backup") }}</li>
+          <li>{{ nav_link("/admin/privacy", "Privacy readiness") }}</li>
+          {% endif %}
+        </ul>
+      </details>
       {% endif %}
       {% if current_user.authenticated %}
-      {% if sso_enabled %}<a href="/auth/sso/peer" title="Open the Construction Kit already signed in">Construction Kit</a>{% endif %}
-      <a href="/auth/tokens">Tokens</a>
-      <a href="/account/privacy">Privacy</a>
-      <span class="nav-user">{{ current_user.username }}</span>
-      <form method="post" action="/auth/logout" class="nav-form"><button type="submit">Logout</button></form>
+      <details class="nav-menu account-menu">
+        <summary><span class="visually-hidden">Account: </span><span class="nav-user">{{ current_user.username }}</span></summary>
+        <ul>
+          {% if sso_enabled %}<li><a href="/auth/sso/peer">Construction Kit</a></li>{% endif %}
+          <li>{{ nav_link("/auth/tokens", "Access tokens") }}</li>
+          <li>{{ nav_link("/account/privacy", "Privacy and data") }}</li>
+          <li><form method="post" action="/auth/logout" class="nav-form"><button type="submit">Sign out</button></form></li>
+        </ul>
+      </details>
       {% else %}
-      <a href="/auth/login">Login</a>
+      <a class="nav-signin" href="/auth/login">Sign in</a>
       {% endif %}
     </nav>
   </header>
@@ -70,13 +92,20 @@
     {% endif %}
   {% endwith %}
 
-  <main class="{% block main_class %}shell{% endblock %}">
+  <main id="main" tabindex="-1" class="{% block main_class %}shell{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 
   <footer class="site-footer">
-    <a href="/privacy">Privacy notice</a>
-    {% if store_contact_email %}<a href="mailto:{{ store_contact_email }}">Contact</a>{% endif %}
+    <nav aria-label="Footer">
+      <ul class="footer-links">
+        <li><a href="/privacy">Privacy notice</a></li>
+        <li><a href="/accessibility">Accessibility</a></li>
+        <li><a href="/api">API</a></li>
+        {% if store_contact_email %}<li><a href="mailto:{{ store_contact_email }}">Contact</a></li>{% endif %}
+      </ul>
+    </nav>
+    <p class="footer-note">This site uses only a strictly necessary session cookie. No analytics or advertising trackers.</p>
   </footer>
 
   <script src="/static/app.js" defer></script>

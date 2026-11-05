@@ -17,6 +17,7 @@
 
   <section>
     <h2>Theme</h2>
+    {% for warning in contrast_warnings %}<p class="error-text" role="alert">{{ warning }}</p>{% endfor %}
     <div class="field-grid">
       <label>Primary Color<input name="theme_primary_color" type="color" value="{{ settings.theme_primary_color }}"></label>
       <label>Secondary Color<input name="theme_secondary_color" type="color" value="{{ settings.theme_secondary_color }}"></label>
@@ -66,6 +67,7 @@
       <label>Metrics retention (days)<input name="privacy_metrics_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_metrics_retention_days }}"></label>
       <label>Unused registration data retention (days)<input name="privacy_registration_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_registration_retention_days }}"></label>
       <label>Privacy audit retention (days)<input name="privacy_audit_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_audit_retention_days }}"></label>
+      <label>Service event log retention (days)<input name="privacy_log_retention_days" type="number" min="1" max="3650" value="{{ settings.privacy_log_retention_days }}"></label>
     </div>
     <label>Recipient Categories<textarea name="privacy_recipient_categories">{{ settings.privacy_recipient_categories }}</textarea></label>
     <label>International Transfers and Safeguards<textarea name="privacy_transfer_details">{{ settings.privacy_transfer_details }}</textarea></label>

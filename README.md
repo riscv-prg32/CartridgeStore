@@ -184,8 +184,9 @@ summary table, a Markdown report, and plots when `matplotlib` is available.
 
 ## Multiplayer
 
-The multiplayer relay keeps the standalone MultiplayerServer JSON protocol, but
-runs on the same Cartridge Store service:
+The multiplayer relay speaks `prg32-multiplayer-1.0`, the protocol of the
+standalone [PRG32-Multiplayer-Server](https://github.com/riscv-prg32/PRG32-Multiplayer-Server),
+and runs on the same Cartridge Store service:
 
 ```text
 ws://127.0.0.1:5080/api/multiplayer
@@ -194,14 +195,15 @@ ws://127.0.0.1:5080/api/multiplayer
 Clients send:
 
 ```json
-{"type":"join","signature":"pong-v1","flags":1,"player_id":123}
+{"type":"join","signature":"pong-v1","flags":1,"player_id":123,"platform":"esp32c6","device_id":"<local id>"}
 {"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
 {"type":"leave"}
+{"type":"ping"}
 ```
 
-The relay replies with `welcome`, `peer`, `leave`, or `error` messages. Clients
-with different cartridge signatures stay isolated. Set `PRG32_MP_MAX_PEERS` to
-change the per-signature room limit.
+The relay answers `welcome` (authoritative `player_id`, `connection_id`,
+pseudonymous `device_id`), `peer`, `leave`, `pong` and coded `error` messages.
+See [docs/api.md](docs/api.md#multiplayer) for the full contract.
 
 ## Compatibility and Safety
 

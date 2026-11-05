@@ -5,38 +5,44 @@
 {% block content %}
 <section class="table-panel">
   <h1>Cartridges</h1>
+  <p class="lead">Edit the catalog text of each cartridge's latest version, or remove a version or one of its builds.</p>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Cartridges">
   <table>
     <thead>
-      <tr><th>ID</th><th>Version</th><th>Metadata</th><th>Architectures</th><th>Actions</th></tr>
+      <tr><th scope="col">Cartridge</th><th scope="col">Version</th><th scope="col">Catalog text</th><th scope="col">Builds</th><th scope="col">Actions</th></tr>
     </thead>
     <tbody>
       {% for game in games %}
+      {% set form_id = "cart-" ~ loop.index %}
       <tr>
-        <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}">
-          <td><a href="/games/{{ game.id }}">{{ game.id }}</a></td>
-          <td>{{ game.selected_version }}</td>
-          <td>
-            <input name="title" value="{{ game.title }}" required>
-            <input name="summary" value="{{ game.summary }}">
-            <input name="tags" value="{{ game.tags | join(', ') }}">
-          </td>
-          <td>{{ game.architectures | join(", ") }}</td>
-          <td class="action-cell">
-            <button type="submit">Save</button>
-        </form>
-            <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete">
-              <button type="submit">Delete Version</button>
-            </form>
-            {% for architecture in game.architectures %}
-            <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete">
-              <input type="hidden" name="architecture" value="{{ architecture }}">
-              <button type="submit">Delete {{ architecture }}</button>
-            </form>
-            {% endfor %}
-          </td>
+        <td><a href="/games/{{ game.id }}">{{ game.title }}</a><br><code>{{ game.id }}</code></td>
+        <td>{{ game.selected_version }}{% if game.has_preview %}<br><span class="badge">Video</span>{% endif %}</td>
+        <td class="stack">
+          <label>Title<input form="{{ form_id }}" name="title" value="{{ game.title }}" required></label>
+          <label>Summary<input form="{{ form_id }}" name="summary" value="{{ game.summary }}"></label>
+          <label>Tags<input form="{{ form_id }}" name="tags" value="{{ game.tags | join(', ') }}"></label>
+        </td>
+        <td>{{ game.architectures | join(", ") }}</td>
+        <td class="action-cell">
+          <form id="{{ form_id }}" method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}">
+            <button type="submit">Save<span class="visually-hidden"> {{ game.title }}</span></button>
+          </form>
+          <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete" data-confirm="Delete {{ game.title }} {{ game.selected_version }} for every architecture?">
+            <button class="danger" type="submit">Delete version<span class="visually-hidden"> {{ game.selected_version }} of {{ game.title }}</span></button>
+          </form>
+          {% for architecture in game.architectures %}
+          <form method="post" action="/admin/cartridges/{{ game.id }}/{{ game.selected_version }}/delete" data-confirm="Delete the {{ architecture }} build of {{ game.title }}?">
+            <input type="hidden" name="architecture" value="{{ architecture }}">
+            <button class="secondary" type="submit">Delete {{ architecture }}<span class="visually-hidden"> build of {{ game.title }}</span></button>
+          </form>
+          {% endfor %}
+        </td>
       </tr>
+      {% else %}
+      <tr><td colspan="5">No cartridges published yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 {% endblock %}

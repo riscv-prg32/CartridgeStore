@@ -16,8 +16,17 @@
       {% endfor %}
     </dd>
     <dt>Status</dt><dd>{{ submission.status }}</dd>
-    <dt>Submitted By</dt><dd>{{ submission.submitted_by }}</dd>
+    <dt>Submitted by</dt><dd>{{ submission.submitted_by }}</dd>
+    <dt>Preview video</dt><dd>{{ "included" if submission.has_preview else "none" }}</dd>
   </dl>
+  {% if submission.has_preview %}
+  <figure class="video-figure">
+    <video controls preload="metadata" playsinline aria-describedby="pendingVideoNote">
+      <source src="/editor/submissions/{{ submission.id }}/preview" type="video/mp4">
+    </video>
+    <figcaption id="pendingVideoNote">Preview video submitted with this package. Check it before publishing.</figcaption>
+  </figure>
+  {% endif %}
 </section>
 
 <form method="post" action="/editor/submissions/{{ submission.id }}/verify" class="setup-form">

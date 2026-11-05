@@ -6,32 +6,33 @@
 <section class="table-panel">
   <h1>Groups</h1>
   <form method="post" action="/admin/groups" class="inline-admin-form">
-    <input name="name" placeholder="group name" required>
-    <button type="submit">Create Group</button>
+    <label>New group<input name="name" required></label>
+    <button type="submit">Create group</button>
   </form>
   <table>
     <thead>
-      <tr><th>Name</th><th>Users</th><th>Created</th><th>Actions</th></tr>
+      <tr><th scope="col">Name</th><th scope="col">Users</th><th scope="col">Created</th><th scope="col">Actions</th></tr>
     </thead>
     <tbody>
       {% for group in groups %}
       <tr>
         <td>
           <form method="post" action="/admin/groups/{{ group.id }}" class="inline-admin-form">
-            <input name="name" value="{{ group.name }}" required>
-            <button type="submit">Save</button>
+            <input name="name" value="{{ group.name }}" aria-label="Name of group {{ group.name }}" required>
+            <button type="submit">Save<span class="visually-hidden"> {{ group.name }}</span></button>
           </form>
         </td>
         <td>{{ group.user_count }}</td>
         <td>{{ group.created_at }}</td>
         <td>
-          <form method="post" action="/admin/groups/{{ group.id }}/delete">
-            <button type="submit" {% if group.name == "editors" %}disabled{% endif %}>Delete</button>
+          <form method="post" action="/admin/groups/{{ group.id }}/delete" data-confirm="Delete group {{ group.name }}?">
+            <button class="danger" type="submit" {% if group.name == "editors" %}disabled aria-describedby="editorsNote"{% endif %}>Delete<span class="visually-hidden"> {{ group.name }}</span></button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  <p class="field-help" id="editorsNote">The <code>editors</code> group reviews submissions and cannot be deleted.</p>
 </section>
 {% endblock %}

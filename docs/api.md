@@ -138,6 +138,11 @@ cartridge is published as the user named in the ticket. `/api/me` and
 | `GET` | `/admin/backup` | Backup/restore page |
 | `GET` | `/admin/backup/download` | Download a full backup ZIP |
 | `POST` | `/admin/backup/restore` | Restore a full backup ZIP |
+| `GET` | `/admin/logs` | Event log with level, category, text and date filters |
+| `GET` | `/admin/logs.csv` | Export the filtered event log as CSV |
+| `GET` | `/api/admin/logs` | Event log and in-memory process log as JSON (`limit`, `offset`) |
+| `GET` | `/admin/stats` | Administrator statistics dashboard |
+| `GET` | `/api/admin/stats` | Catalog, download, account, play and health figures as JSON |
 
 ## Cartridge Catalog
 
@@ -149,6 +154,7 @@ cartridge is published as the user named in the ticket. `/api/me` and
 | `GET` | `/api/games/<id>` | Fetch one game record |
 | `GET` | `/api/games/<id>/icon` | Fetch icon bytes |
 | `GET` | `/api/games/<id>/screenshot` | Fetch screenshot bytes |
+| `GET` | `/api/games/<id>/preview` | Stream the version's `preview.mp4` (answers HTTP Range requests) |
 | `GET` | `/api/games/<id>/colophon` | Fetch colophon JSON |
 | `GET` | `/api/games/<id>/download` | Download `.prg32` artifact |
 | `POST` | `/api/publish` | Upload a zip bundle package for review |
@@ -158,6 +164,11 @@ cartridge is published as the user named in the ticket. `/api/me` and
 | `POST` | `/api/submissions/<id>/reject` | Reject a pending submission |
 
 Download requests accept `version` and `architecture` query parameters.
+
+`GET /api/games` also returns `featured`: the most recently published or
+updated cartridges, newest first, each with `featured_reason` (`new` or
+`updated`). Game records carry the optional fields `created_at`,
+`has_preview` and `preview` (`size`, `sha256`, `mime`, `updated_at`).
 
 `GET /api/games` accepts optional browsing parameters:
 
@@ -190,6 +201,7 @@ Zip layout:
 manifest.json
 icon.png
 splash.png          optional
+preview.mp4         optional gameplay video shown on the cartridge page
 *.prg32             one or more
 ```
 
@@ -210,6 +222,12 @@ filename and a non-empty `architectures` list:
   ]
 }
 ```
+
+The preview video is found either at `preview.mp4` in the ZIP root or at the
+path named by `assets.preview`. It must be an MP4 file (an ISO `ftyp` box) and
+fits within the bundle size limit. Editors can watch it before verifying the
+submission; it is published with the version and removed with it. The upload
+answer reports `"preview": true` when one was found.
 
 Both `/api/publish/bundle` and the compatibility alias `/api/publish` accept
 only zip packages. The old per-field `.prg32` upload shape is rejected.
@@ -339,19 +357,75 @@ Response:
 
 ## Multiplayer
 
-The multiplayer relay is compatible with the standalone PRG32 MultiplayerServer.
+The relay speaks `prg32-multiplayer-1.0`, the wire protocol specified by
+[PRG32-Multiplayer-Server](https://github.com/riscv-prg32/PRG32-Multiplayer-Server)
+(`docs/protocol.md`). A console can use either server without changes.
 
 ```text
 ws://host:5080/api/multiplayer
 ```
 
-Clients send JSON messages:
+Each WebSocket text message is one JSON object of at most 1,024 bytes. Clients
+send:
 
 ```json
-{"type":"join","signature":"pong-v1","flags":1,"player_id":123}
-{"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
+{"type":"join","signature":"poing-wall:v1","flags":1,"player_id":2718281828,
+ "protocol":"prg32-multiplayer-1.0","platform":"qemu","device_id":"<installation UUID>"}
+{"type":"state","x":148,"y":91,"sprite":3,"flags":1,"input":16,"frame":9402}
 {"type":"leave"}
+{"type":"ping"}
 ```
 
-Signatures may contain letters, digits, `_`, `-`, `.`, and `:`, up to 47
-characters.
+The relay answers:
+
+```json
+{"type":"welcome","protocol":"prg32-multiplayer-1.0","player_id":2718281828,
+ "connection_id":"<uuid>","device_id":"<22 base64url chars>","platform":"qemu",
+ "persistent_device_id":true}
+{"type":"peer","player_id":2718281828,"device_id":"...","platform":"qemu",
+ "x":148,"y":91,"sprite":3,"flags":1,"input":16,"frame":9402}
+{"type":"leave","player_id":2718281828}
+{"type":"pong","time":1793456789012}
+{"type":"error","code":"invalid_input","error":"invalid input"}
+```
+
+Rules, as in the reference server:
+
+- `signature`: 1–47 characters from letters, digits, `_`, `-`, `.`, `:`.
+  Rooms are isolated by exact signature.
+- `platform` is one of `esp32c6`, `qemu`, `prg32-qt`, `prg-ios`; any other
+  value becomes `unknown`. `device_id` (1–128 characters) is source material
+  only: the relay returns `base64url(HMAC-SHA-256(secret, platform NUL
+  device_id))[0:22]` and never stores, logs or relays the raw value. A join
+  without `device_id` (legacy firmware) gets a connection-only pseudonym and
+  `persistent_device_id: false`.
+- The `player_id` in `welcome` is authoritative. A requested ID is kept when it
+  is free in the room; otherwise the relay picks a random nonzero 32-bit ID.
+  The sender of a `state` is its connection: a `player_id` inside `state` is
+  ignored.
+- `state` fields are exact integers: `x`, `y` in −32768…32767, `sprite` and
+  `flags` in 0…65535, `input` in 0…127, `frame` in 0…4294967295. Invalid
+  fields are answered with `invalid_<field>` and the message is dropped.
+- `state` before `join` gets `join_required`; `leave` before `join` is a no-op.
+  Snapshots are relayed to the other room members only, never echoed and never
+  stored or replayed.
+- Error codes: `invalid_json`, `invalid_message`, `unknown_type`,
+  `message_too_large`, `invalid_signature`, `invalid_player_id`,
+  `invalid_flags`, `invalid_device_id`, `invalid_x`, `invalid_y`,
+  `invalid_sprite`, `invalid_input`, `invalid_frame`, `join_required`,
+  `room_full`, `rate_limited`, `binary_not_supported`. The `error` member
+  repeats the code in words for older Cartridge Store clients.
+- More than 40 messages per second closes the socket with code 1008 after a
+  `rate_limited` error. A connection silent for 15 seconds is closed.
+
+Store extension: when `PRG32_USERS` tokens are configured, `join` needs a token
+with the `player` role (in the `token` member, the `Authorization` header, or
+the `token` query parameter); otherwise the answer is the error code
+`unauthorized`.
+
+`GET /api/multiplayer` describes the protocol and limits;
+`GET /api/multiplayer/status` reports rooms, players and connections. Limits
+are set with `PRG32_MP_MAX_PEERS` (room size, default 8, the firmware peer
+table size), `PRG32_MP_MAX_MESSAGE_BYTES`, `PRG32_MP_MAX_RATE` and
+`PRG32_MP_IDLE_TIMEOUT`. `PRG32_MP_DEVICE_ID_SECRET` sets the pseudonym key;
+without it the key is derived from `SECRET_KEY`.

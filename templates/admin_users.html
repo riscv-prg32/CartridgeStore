@@ -5,61 +5,79 @@
 {% block content %}
 <section class="table-panel">
   <h1>Users</h1>
+  <h2>Create a user</h2>
   <form method="post" action="/admin/users" class="inline-admin-form">
-    <input name="username" placeholder="username" required>
-    <input name="email" type="email" placeholder="email" required>
-    <input name="public_handle" placeholder="public handle" pattern="[a-z0-9][a-z0-9_-]{2,31}" required>
-    <input name="password" type="password" placeholder="password">
-    <select name="role">
-      {% for role in roles %}
-      <option value="{{ role }}">{{ role }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">Create User</button>
+    <label>Username<input name="username" autocomplete="off" required></label>
+    <label>Email<input name="email" type="email" autocomplete="off" required></label>
+    <label>Public handle<input name="public_handle" pattern="[a-z0-9][a-z0-9_-]{2,31}" aria-describedby="handleHelp" required></label>
+    <label>Password<input name="password" type="password" autocomplete="new-password" aria-describedby="passwordHelp"></label>
+    <label>Role
+      <select name="role">
+        {% for role in roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit">Create user</button>
   </form>
+  <p class="field-help" id="handleHelp">Public handle: 3–32 lowercase letters, digits, <code>_</code> or <code>-</code>. It is the only name shown publicly.</p>
+  <p class="field-help" id="passwordHelp">Leave the password empty to create an account that signs in through a configured provider.</p>
   {% if sso_enabled %}
   <form method="post" action="/admin/sso/sync" class="inline-admin-form">
     <span>Users are shared with the Construction Kit. Changes are sent right away; use this after the kit was offline or when turning sync on.</span>
     <button type="submit">Sync now</button>
   </form>
   {% endif %}
+
+  <h2>Accounts</h2>
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Accounts">
   <table>
     <thead>
-      <tr><th>Username</th><th>Email</th><th>Public handle</th><th>Role</th><th>Groups</th><th>Provider</th><th>Created</th><th>Actions</th></tr>
+      <tr><th scope="col">Username</th><th scope="col">Email</th><th scope="col">Public handle</th><th scope="col">Role</th><th scope="col">Groups</th><th scope="col">Provider</th><th scope="col">Created</th><th scope="col">Actions</th></tr>
     </thead>
     <tbody>
       {% for user in users %}
+      {% set form_id = "user-" ~ user.id %}
       <tr>
-        <form method="post" action="/admin/users/{{ user.id }}">
-          <td><input name="username" value="{{ user.username }}" required></td>
-          <td><input name="email" type="email" value="{{ user.email }}" required></td>
-          <td><input name="public_handle" value="{{ user.public_handle }}" pattern="[a-z0-9][a-z0-9_-]{2,31}" required></td>
-          <td>
-            <select name="role">
-              {% for role in roles %}
-              <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role }}</option>
-              {% endfor %}
-            </select>
-          </td>
-          <td>
-            {% for group in groups %}
-            <label class="inline-check"><input type="checkbox" name="groups" value="{{ group.name }}" {% if group.name in user.groups %}checked{% endif %}> {{ group.name }}</label>
+        <td><input form="{{ form_id }}" name="username" value="{{ user.username }}" aria-label="Username of {{ user.username }}" required></td>
+        <td><input form="{{ form_id }}" name="email" type="email" value="{{ user.email }}" aria-label="Email of {{ user.username }}" required></td>
+        <td><input form="{{ form_id }}" name="public_handle" value="{{ user.public_handle }}" pattern="[a-z0-9][a-z0-9_-]{2,31}" aria-label="Public handle of {{ user.username }}" required></td>
+        <td>
+          <select form="{{ form_id }}" name="role" aria-label="Role of {{ user.username }}">
+            {% for role in roles %}
+            <option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role }}</option>
             {% endfor %}
-            <input name="extra_groups" placeholder="extra groups">
-          </td>
-          <td>{{ user.external_provider or "local" }}</td>
-          <td>{{ user.created_at }}</td>
-          <td class="action-cell">
-            <input name="password" type="password" placeholder="new password">
-            <button type="submit">Save</button>
-        </form>
-            <form method="post" action="/admin/users/{{ user.id }}/delete">
-              <button type="submit">Delete</button>
-            </form>
-          </td>
+          </select>
+        </td>
+        <td>
+          <fieldset class="group-set">
+            <legend class="visually-hidden">Groups of {{ user.username }}</legend>
+            {% for group in groups %}
+            <label class="inline-check"><input form="{{ form_id }}" type="checkbox" name="groups" value="{{ group.name }}" {% if group.name in user.groups %}checked{% endif %}> {{ group.name }}</label>
+            {% endfor %}
+            <input form="{{ form_id }}" name="extra_groups" placeholder="more groups, comma separated" aria-label="More groups for {{ user.username }}">
+          </fieldset>
+        </td>
+        <td>{{ user.external_provider or "local" }}</td>
+        <td>{{ (user.created_at or "")[:10] }}</td>
+        <td class="action-cell">
+          <form id="{{ form_id }}" method="post" action="/admin/users/{{ user.id }}">
+            <input name="password" type="password" placeholder="new password" autocomplete="new-password" aria-label="New password for {{ user.username }}">
+            <button type="submit">Save<span class="visually-hidden"> {{ user.username }}</span></button>
+          </form>
+          <form method="post" action="/admin/users/{{ user.id }}/delete" data-confirm="Erase {{ user.username }} and their personal data? This cannot be undone.">
+            <button class="danger" type="submit">Erase<span class="visually-hidden"> {{ user.username }}</span></button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  <nav class="pagination" aria-label="User pages">
+    <div class="pagination-links">
+      {% if page > 1 %}<a class="button secondary" href="/admin/users?page={{ page - 1 }}" rel="prev">Previous</a>{% endif %}
+      <span class="page-count">Page {{ page }}</span>
+      {% if users | length == 50 %}<a class="button secondary" href="/admin/users?page={{ page + 1 }}" rel="next">Next</a>{% endif %}
+    </div>
+  </nav>
 </section>
 {% endblock %}

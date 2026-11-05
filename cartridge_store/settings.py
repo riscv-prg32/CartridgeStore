@@ -67,6 +67,7 @@ DEFAULT_SETTINGS = {
     "privacy_metrics_retention_days": "365",
     "privacy_registration_retention_days": "7",
     "privacy_audit_retention_days": "365",
+    "privacy_log_retention_days": "90",
     "privacy_representative": "",
     "privacy_recipient_categories": "",
     "privacy_transfer_details": "No international transfers are configured by the Cartridge Store itself.",
@@ -103,6 +104,41 @@ def set_setting(key: str, value: Any) -> None:
     )
     get_db().commit()
     _theme_cache.pop(str(current_app.config["DATABASE"]), None)
+
+
+def _luminance(color: str) -> float | None:
+    text = str(color or "").strip().lstrip("#")
+    if len(text) == 3:
+        text = "".join(char * 2 for char in text)
+    if len(text) != 6:
+        return None
+    try:
+        channels = [int(text[index:index + 2], 16) / 255 for index in (0, 2, 4)]
+    except ValueError:
+        return None
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast_with_white(color: str) -> float | None:
+    """WCAG contrast ratio of white text on ``color`` (None if not a hex color)."""
+    luminance = _luminance(color)
+    if luminance is None:
+        return None
+    return round(1.05 / (luminance + 0.05), 2)
+
+
+def theme_contrast_warnings(values: dict[str, str]) -> list[str]:
+    """Theme colors under the WCAG AA 4.5:1 ratio for the white text drawn on them."""
+    warnings = []
+    for key, label in (("theme_primary_color", "Primary"), ("theme_secondary_color", "Secondary")):
+        ratio = contrast_with_white(values.get(key, ""))
+        if ratio is not None and ratio < 4.5:
+            warnings.append(
+                f"{label} color {values.get(key)} gives white text a contrast of {ratio}:1; "
+                "WCAG AA needs at least 4.5:1. Choose a darker color."
+            )
+    return warnings
 
 
 def theme_context() -> dict[str, str]:

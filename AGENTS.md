@@ -55,6 +55,7 @@ Do not break existing firmware/tool clients:
 - `GET /api/games/<id>`
 - `GET /api/games/<id>/icon`
 - `GET /api/games/<id>/screenshot`
+- `GET /api/games/<id>/preview`
 - `GET /api/games/<id>/colophon`
 - `GET /api/games/<id>/download`
 - `POST /api/publish`
@@ -70,6 +71,10 @@ Do not break existing firmware/tool clients:
 - `GET /api/multiplayer/status`
 - `WS /api/multiplayer`
 - `GET /.well-known/prg32-store.json`
+
+The multiplayer relay must stay wire-compatible with `prg32-multiplayer-1.0`
+as specified in PRG32-Multiplayer-Server `docs/protocol.md`; see
+`tests/test_multiplayer_protocol.py`.
 
 When changing response shapes, preserve old fields and add new optional fields
 instead of replacing existing ones.

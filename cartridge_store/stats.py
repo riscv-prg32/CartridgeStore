@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
+from pathlib import Path
 import re
 import time
 from typing import Any
@@ -12,7 +13,7 @@ from typing import Any
 from flask import Flask, current_app, jsonify, render_template, request
 
 from . import charts
-from .auth import current_principal
+from .auth import admin_required, current_principal
 from .database import get_db, init_schema_once
 from .settings import get_setting
 from .store import GameStore, StoreError
@@ -40,9 +41,39 @@ ON download_events(architecture);
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+CLIENT_CLASSES = ("prg32", "browser", "tool", "other")
+
+
+def client_class(user_agent: str | None) -> str:
+    """Reduce a User-Agent to a coarse client class.
+
+    Only this class is stored (data minimisation): it answers "do downloads
+    come from consoles and PRG32 tools or from browsers?" without keeping a
+    browser fingerprint.
+    """
+    agent = str(user_agent or "").lower()
+    if "prg32" in agent or "esp32" in agent or "esp-idf" in agent or "qemu" in agent:
+        return "prg32"
+    if "mozilla" in agent:
+        return "browser"
+    if any(name in agent for name in ("curl", "wget", "python", "httpie", "go-http", "node")):
+        return "tool"
+    return "other"
+
+
 def init_stats_db() -> None:
     db = get_db()
     db.executescript(STATS_SCHEMA)
+    # Older releases stored the raw User-Agent; keep only its class.
+    legacy = db.execute(
+        "SELECT DISTINCT user_agent FROM download_events WHERE user_agent NOT IN (?, ?, ?, ?)",
+        CLIENT_CLASSES,
+    ).fetchall()
+    for row in legacy:
+        db.execute(
+            "UPDATE download_events SET user_agent = ? WHERE user_agent IS ?",
+            (client_class(row["user_agent"]), row["user_agent"]),
+        )
     db.commit()
 
 
@@ -69,7 +100,7 @@ def record_download(game_id: str, version: str, architecture: str) -> None:
             architecture,
             principal.id if principal.authenticated else None,
             _hash_ip(request.remote_addr),
-            request.headers.get("User-Agent", "")[:300],
+            client_class(request.headers.get("User-Agent", "")),
         ),
     )
     get_db().commit()
@@ -252,6 +283,99 @@ def _runs_summary() -> dict[str, Any]:
     }
 
 
+def _count(sql: str, params: tuple[Any, ...] = ()) -> int:
+    try:
+        row = get_db().execute(sql, params).fetchone()
+    except Exception as exc:  # optional tables may not exist yet
+        if "no such table" in str(exc):
+            return 0
+        raise
+    return int(row[0] if row and row[0] is not None else 0)
+
+
+def _grouped(sql: str, params: tuple[Any, ...] = ()) -> list[tuple[str, int]]:
+    try:
+        rows = get_db().execute(sql, params).fetchall()
+    except Exception as exc:
+        if "no such table" in str(exc):
+            return []
+        raise
+    return [(str(row[0] if row[0] is not None else "unknown"), int(row[1])) for row in rows]
+
+
+def _directory_size(path: Path) -> int:
+    if not path.is_dir():
+        return 0
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def admin_statistics(store: GameStore) -> dict[str, Any]:
+    """Operational figures for administrators (no per-person data)."""
+    games = store.list_games()
+    index = store.load_index().get("games", {})
+    versions = sum(len(game.get("versions", {})) for game in index.values())
+    variants = sum(
+        len(version.get("architectures", {}))
+        for game in index.values()
+        for version in game.get("versions", {}).values()
+    )
+    previews = sum(
+        1
+        for game in index.values()
+        for version in game.get("versions", {}).values()
+        if isinstance(version.get("preview"), dict)
+    )
+    hub = current_app.extensions.get("prg32_multiplayer_hub")
+    multiplayer = hub.status() if hub is not None else {}
+    from .logs import level_counts
+
+    return {
+        "catalog": {
+            "games": len(games),
+            "versions": versions,
+            "variants": variants,
+            "previews": previews,
+            "storage_bytes": _directory_size(store.cartridge_dir),
+            "pending_storage_bytes": _directory_size(store.data_dir / "pending"),
+            "architectures": _grouped(
+                "SELECT architecture, COUNT(*) FROM download_events GROUP BY architecture ORDER BY 2 DESC"
+            ),
+        },
+        "submissions": dict(
+            _grouped("SELECT status, COUNT(*) FROM cartridge_submissions GROUP BY status ORDER BY status")
+        ),
+        "users": {
+            "total": _count("SELECT COUNT(*) FROM users"),
+            "by_role": _grouped("SELECT role, COUNT(*) FROM users GROUP BY role ORDER BY 2 DESC"),
+            "by_provider": _grouped(
+                "SELECT COALESCE(external_provider, 'local'), COUNT(*) FROM users GROUP BY 1 ORDER BY 2 DESC"
+            ),
+            "new_30_days": _count("SELECT COUNT(*) FROM users WHERE created_at >= datetime('now', '-30 days')"),
+            "active_30_days": _count(
+                "SELECT COUNT(*) FROM users WHERE last_login IS NOT NULL "
+                "AND replace(substr(last_login, 1, 19), 'T', ' ') >= datetime('now', '-30 days')"
+            ),
+        },
+        "downloads": {
+            "total": _count("SELECT COUNT(*) FROM download_events"),
+            "last_7_days": _count("SELECT COUNT(*) FROM download_events WHERE downloaded_at >= datetime('now', '-7 days')"),
+            "last_30_days": _count("SELECT COUNT(*) FROM download_events WHERE downloaded_at >= datetime('now', '-30 days')"),
+            "signed_in": _count("SELECT COUNT(*) FROM download_events WHERE user_id IS NOT NULL"),
+            "by_client": _grouped(
+                "SELECT user_agent, COUNT(*) FROM download_events GROUP BY user_agent ORDER BY 2 DESC"
+            ),
+        },
+        "scores": {
+            "total": _count("SELECT COUNT(*) FROM scores"),
+            "games": _count("SELECT COUNT(DISTINCT game) FROM scores"),
+            "players": _count("SELECT COUNT(DISTINCT player) FROM scores"),
+        },
+        "runs": _runs_summary(),
+        "multiplayer": multiplayer,
+        "log_levels_7_days": level_counts(7),
+    }
+
+
 def register_stats_routes(app: Flask, store: GameStore) -> None:
     @app.before_request
     def before_stats_request() -> None:
@@ -274,6 +398,35 @@ def register_stats_routes(app: Flask, store: GameStore) -> None:
     @app.get("/api/stats/runs")
     def api_stats_runs():
         return jsonify(_runs_summary())
+
+    @app.get("/api/admin/stats")
+    @admin_required
+    def api_admin_stats():
+        return jsonify({"ok": True, "stats": admin_statistics(store)})
+
+    @app.get("/admin/stats")
+    @admin_required
+    def admin_stats_page():
+        stats = admin_statistics(store)
+        primary = get_setting("theme_primary_color", "#1a73e8")
+        summary = download_summary(store)
+        return render_template(
+            "admin_stats.html",
+            stats=stats,
+            summary=summary,
+            trend_chart=charts.line_chart(
+                [{"x": item["date"], "y": item["downloads"]} for item in summary["series"]],
+                x_label="Date",
+                y_label="Downloads",
+                color=primary,
+                title="Downloads per day",
+            ),
+            client_chart=charts.bar_chart(stats["downloads"]["by_client"], color=primary, title="Downloads by client"),
+            role_chart=charts.bar_chart(stats["users"]["by_role"], color=primary, title="Accounts by role"),
+            submission_chart=charts.bar_chart(
+                sorted(stats["submissions"].items()), color=primary, title="Submissions by status"
+            ),
+        )
 
     @app.get("/stats")
     def stats_page():

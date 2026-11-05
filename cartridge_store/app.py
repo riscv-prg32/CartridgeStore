@@ -45,22 +45,24 @@ from .auth import (
     normalize_public_handle,
 )
 from .database import close_db, get_db, reset_schema_cache
+from .logs import log_event, register_log_routes
 from .mdns import register_mdns
 from .metrics import register_metrics_routes
-from .multiplayer import register_multiplayer_routes
+from .multiplayer import PROTOCOL as MULTIPLAYER_PROTOCOL, register_multiplayer_routes
 from .privacy import erase_user, register_privacy_routes
 from .review import create_submission, register_review_routes
 from .scores import register_score_routes
-from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting
+from .settings import DEFAULT_SETTINGS, get_setting, register_settings, set_setting, theme_contrast_warnings
 from . import sso
 from .stats import game_download_breakdown, record_download, register_stats_routes
-from .store import GameStore, StoreError, safe_game_id, safe_version
+from .store import PREVIEW_FILENAME, GameStore, StoreError, is_mp4, safe_game_id, safe_version
 from .users import register_user_routes
 
 
 DEFAULT_MAX_UPLOAD = 8 * 1024 * 1024
 DEFAULT_CATALOG_PER_PAGE = 24
 MAX_CATALOG_PER_PAGE = 100
+FEATURED_COUNT = 4
 
 
 class CartridgeRequest(FlaskRequest):
@@ -164,6 +166,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     store = GameStore(app.config["DATA_DIR"])
     app.teardown_appcontext(close_db)
     register_auth_routes(app)
+    register_log_routes(app)
     register_settings(app)
     register_score_routes(app)
     register_metrics_routes(app)
@@ -203,9 +206,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         q = request.args.get("q", "")
         games = store.list_games(q)
         pagination = _catalog_pagination(games)
+        # Featured shelf: the latest new or updated cartridges, shown on the
+        # first unfiltered catalog page only.
+        featured = store.featured_games(FEATURED_COUNT) if not q and pagination["page"] == 1 else []
         return render_template(
             "index.html",
             games=pagination["items"],
+            featured=featured,
             q=q,
             pagination=pagination,
         )
@@ -225,6 +232,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             download_count=download_stats["total"],
         )
 
+    @app.get("/accessibility")
+    def accessibility_statement():
+        return render_template("accessibility.html")
+
     @app.get("/publish")
     @login_required
     def publish_page():
@@ -239,12 +250,14 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def publish_page_post():
         result = publish_request(store)
         flash(f"Package uploaded for editor review as submission #{result['submission_id']}.")
+        log_event("review", "submission.received", f"Submission #{result['submission_id']}: {result['id']} {result['version']}")
         return redirect(url_for("publish_page"))
 
     @app.get("/setup")
     @admin_required
     def setup_page():
-        return render_template("setup.html", settings=_settings_form_values())
+        values = _settings_form_values()
+        return render_template("setup.html", settings=values, contrast_warnings=theme_contrast_warnings(values))
 
     @app.post("/setup")
     @admin_required
@@ -273,6 +286,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             else:
                 set_setting(key, request.form.get(key, DEFAULT_SETTINGS.get(key, "")))
         flash("Settings saved.")
+        log_event("admin", "settings.saved", "Store settings were saved")
         return redirect(url_for("setup_page"))
 
     @app.post("/setup/logo")
@@ -338,6 +352,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         db.commit()
         _set_groups_from_form(int(cursor.lastrowid))
         sso.user_changed(int(cursor.lastrowid))
+        log_event("admin", "user.created", f"User #{cursor.lastrowid} created with role {role}")
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>")
@@ -396,6 +411,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             )
         _set_groups_from_form(user_id)
         sso.user_changed(user_id, previous_email=str(previous["email"]) if previous else None)
+        log_event("admin", "user.updated", f"User #{user_id} updated (role {role}{', password reset' if password else ''})")
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/role")
@@ -409,6 +425,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return jsonify({"ok": False, "error": "unknown role"}), 400
         _set_user_role(user_id, role)
         sso.user_changed(user_id)
+        log_event("admin", "user.role", f"User #{user_id} role set to {role}")
         return redirect(url_for("admin_users"))
 
     @app.post("/admin/users/<int:user_id>/groups")
@@ -416,6 +433,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def admin_user_groups(user_id: int):
         _set_groups_from_form(user_id)
         sso.user_changed(user_id)
+        log_event("admin", "user.groups", f"User #{user_id} groups changed")
         return redirect(url_for("admin_users"))
 
     @app.delete("/admin/users/<int:user_id>")
@@ -429,6 +447,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             deleted = erase_user(user_id, store)
         except ValueError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 400
+        if deleted:
+            log_event("admin", "user.erased", f"User #{user_id} and linked personal data erased", level="WARNING")
         if request.method == "DELETE":
             return jsonify({"ok": deleted})
         return redirect(url_for("admin_users"))
@@ -446,6 +466,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return jsonify({"ok": False, "error": "group name is required"}), 400
         get_db().execute("INSERT OR IGNORE INTO groups(name) VALUES (?)", (name,))
         get_db().commit()
+        log_event("admin", "group.created", f"Group {name} created")
         return redirect(url_for("admin_groups"))
 
     @app.post("/admin/groups/<int:group_id>")
@@ -459,6 +480,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             (name, group_id),
         )
         get_db().commit()
+        log_event("admin", "group.updated", f"Group #{group_id} renamed to {name}")
         return redirect(url_for("admin_groups"))
 
     @app.route("/admin/groups/<int:group_id>/delete", methods=["DELETE", "POST"])
@@ -467,6 +489,8 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         get_db().execute("DELETE FROM user_groups WHERE group_id = ?", (group_id,))
         cursor = get_db().execute("DELETE FROM groups WHERE id = ? AND name != 'editors'", (group_id,))
         get_db().commit()
+        if cursor.rowcount:
+            log_event("admin", "group.deleted", f"Group #{group_id} deleted")
         if request.method == "DELETE":
             return jsonify({"ok": cursor.rowcount > 0})
         return redirect(url_for("admin_groups"))
@@ -499,6 +523,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             summary=request.form.get("summary", ""),
             tags=split_csv(request.form.get("tags", "")),
         )
+        log_event("catalog", "cartridge.updated", f"Metadata of {game_id} {version} edited")
         return redirect(url_for("admin_cartridges"))
 
     @app.route("/admin/cartridges/<game_id>/<version>/delete", methods=["DELETE", "POST"])
@@ -508,10 +533,13 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return redirect(url_for("auth_login", next=request.full_path))
         if principal.role != "admin" and "editors" not in principal.groups:
             return render_template("error.html", error="editors group required"), 403
-        store.delete_variant(
-            game_id,
-            version,
-            architecture=request.form.get("architecture") or request.args.get("architecture"),
+        architecture = request.form.get("architecture") or request.args.get("architecture")
+        store.delete_variant(game_id, version, architecture=architecture)
+        log_event(
+            "catalog",
+            "cartridge.deleted",
+            f"Deleted {game_id} {version}" + (f" ({architecture})" if architecture else " (all architectures)"),
+            level="WARNING",
         )
         if request.method == "DELETE":
             return jsonify({"ok": True})
@@ -526,6 +554,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     @admin_required
     def admin_backup_download():
         archive = _create_backup_archive(store)
+        log_event("admin", "backup.downloaded", "Full backup archive downloaded", level="WARNING")
         response = send_file(
             archive,
             mimetype="application/zip",
@@ -543,6 +572,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             return jsonify({"ok": False, "error": "backup file is required"}), 400
         _restore_backup_archive(store, upload.read())
         flash("Backup restored.")
+        log_event("admin", "backup.restored", "Backup archive restored", level="WARNING")
         return redirect(url_for("admin_backup_page"))
 
     @app.get("/manifest.webmanifest")
@@ -574,6 +604,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 "auth_enabled": auth_is_configured(),
                 "roles": list(ROLE_LEVELS),
                 "sso": {"enabled": sso.enabled(), "abi": sso.protocol.SSO_ABI},
+                "protocols": {"multiplayer": MULTIPLAYER_PROTOCOL},
                 "services": {
                     "cartridges": base + "/api/games",
                     "bundle_publish": base + "/api/publish/bundle",
@@ -601,6 +632,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
                 },
                 "endpoints": [
                     "GET /api/games",
+                    "GET /api/games/<id>/preview",
                     "POST /api/publish",
                     "POST /api/publish/bundle",
                     "GET /api/submissions",
@@ -641,6 +673,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             {
                 "ok": True,
                 "games": pagination["items"],
+                "featured": store.featured_games(FEATURED_COUNT),
                 "pagination": {
                     key: pagination[key]
                     for key in (
@@ -686,6 +719,12 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             mimetype=variant.get("screenshot_mime") or "image/png",
         )
 
+    @app.get("/api/games/<game_id>/preview")
+    def api_preview(game_id: str):
+        _, path = store.preview_path(game_id, version=request.args.get("version"))
+        # conditional=True answers HTTP Range requests, so players can seek.
+        return send_file(path, mimetype="video/mp4", conditional=True)
+
     @app.get("/api/games/<game_id>/colophon")
     def api_colophon(game_id: str):
         _, _, parsed = store.parse_variant(
@@ -718,6 +757,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     def api_publish():
         result = publish_request(store)
         result["legacy_endpoint"] = True
+        log_event("review", "submission.received", f"Submission #{result['submission_id']}: {result['id']} {result['version']}")
         return jsonify(result)
 
     @app.post("/api/publish/bundle")
@@ -727,6 +767,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         if request.content_length is not None and request.content_length > limit:
             return jsonify({"ok": False, "error": "bundle upload is too large"}), 413
         result = publish_bundle_request(store)
+        log_event("review", "submission.received", f"Submission #{result['submission_id']}: {result['id']} {result['version']}")
         return jsonify(result)
 
     return app
@@ -754,6 +795,7 @@ def _save_custom_asset(kind: str, setting_key: str):
     (custom_dir / filename).write_bytes(data)
     url = url_for("custom_static", filename=filename)
     set_setting(setting_key, url)
+    log_event("admin", f"theme.{kind}", f"Custom {kind} uploaded")
     if request.accept_mimetypes.best == "application/json":
         return jsonify({"ok": True, "url": url})
     return redirect(url_for("setup_page"))
@@ -956,10 +998,11 @@ def publish_bundle_request(store: GameStore) -> dict[str, Any]:
     try:
         with zipfile.ZipFile(BytesIO(bundle)) as zf:
             prepared = _prepare_bundle(zf)
+            preview = _bundle_preview(zf)
     except zipfile.BadZipFile as exc:
         raise StoreError("bundle must be a valid zip file") from exc
 
-    submission = create_submission(prepared)
+    submission = create_submission(prepared, preview=preview)
     manifest = prepared[0]["manifest"]
     return {
         "status": "pending",
@@ -972,7 +1015,29 @@ def publish_bundle_request(store: GameStore) -> dict[str, Any]:
             {"architecture": item["architecture"], "file": item["file"]}
             for item in prepared
         ],
+        "preview": preview is not None,
     }
+
+
+def _bundle_preview(zf: zipfile.ZipFile) -> bytes | None:
+    """Read the optional preview video: ``assets.preview`` or ``preview.mp4``."""
+    names = {info.filename for info in zf.infolist() if not info.is_dir()}
+    manifest = _read_manifest(zf)
+    assets = manifest.get("assets") if isinstance(manifest.get("assets"), dict) else {}
+    if assets.get("preview"):
+        name = _manifest_filename(assets.get("preview"), "manifest.assets.preview")
+        if name not in names:
+            raise StoreError("bundle preview file is missing")
+    elif PREVIEW_FILENAME in names:
+        name = PREVIEW_FILENAME
+    else:
+        return None
+    if not name.lower().endswith(".mp4"):
+        raise StoreError("manifest.assets.preview must point to an .mp4 file")
+    data = zf.read(name)
+    if not is_mp4(data):
+        raise StoreError("preview.mp4 must be an MP4 video")
+    return data
 
 
 def _prepare_bundle(zf: zipfile.ZipFile) -> list[dict[str, Any]]:

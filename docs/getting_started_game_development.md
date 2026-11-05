@@ -67,6 +67,11 @@ cartridge files and an icon in the same directory:
 ```
 
 For a real publication, use your own game ID, authors, version, and artwork.
+
+To show a gameplay video on the cartridge page, add a short `preview.mp4`
+(H.264, no sound needed, a few MB) beside the manifest, or name it with
+`"assets": {"icon": "icon.png", "preview": "preview.mp4"}`. Editors watch it
+during review; the page never plays it automatically.
 Place `icon.png` beside the manifest, then package and submit:
 
 ```bash
