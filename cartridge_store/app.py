@@ -45,6 +45,7 @@ from .auth import (
     normalize_public_handle,
 )
 from .database import close_db, get_db, reset_schema_cache
+from .firmware import register_firmware_routes
 from .logs import log_event, register_log_routes
 from .mdns import register_mdns
 from .metrics import register_metrics_routes
@@ -153,6 +154,10 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
         SSO_SECRET=os.environ.get("PRG32_SSO_SECRET", ""),
         SSO_PEER_URL=os.environ.get("PRG32_SSO_PEER_URL", ""),
         SSO_TIMEOUT=float(os.environ.get("PRG32_SSO_TIMEOUT", "5")),
+        # PRG32 firmware releases offered at /firmware (docs/firmware_flashing.md).
+        FIRMWARE_REPO=os.environ.get("PRG32_FIRMWARE_REPO", "riscv-prg32/PRG32"),
+        FIRMWARE_DIR=os.environ.get("PRG32_FIRMWARE_DIR", ""),
+        FIRMWARE_LIST_TTL=float(os.environ.get("PRG32_FIRMWARE_LIST_TTL", "600")),
     )
     if test_config:
         app.config.update(test_config)
@@ -176,6 +181,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
     register_review_routes(app, store)
     register_privacy_routes(app, store)
     sso.register_sso_routes(app)
+    register_firmware_routes(app)
     register_mdns(app)
 
     @app.errorhandler(StoreError)

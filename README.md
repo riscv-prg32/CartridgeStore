@@ -269,6 +269,8 @@ Integrate with clients and tools:
   with a PRG32-Construction-Kit.
 - [Install over USB](docs/usb_install.md): putting a published cartridge on a
   PRG32 connected to the visitor's computer, from the game page (Web Serial).
+- [Update the firmware over USB](docs/firmware_flashing.md): browsing PRG32
+  firmware releases and writing one onto a console from the Firmware page.
 - [Unified service API](docs/api.md): discovery document, auth endpoints,
   admin endpoints, cartridge package format, editor verification API, scores,
   metrics, statistics, multiplayer, and compatibility notes.
@@ -283,6 +285,7 @@ What to read for common tasks:
 - Create a new PRG32 game cartridge:
   [Getting started with PRG32 game development](docs/getting_started_game_development.md).
 - Install a cartridge on a PRG32 over USB: [Install over USB](docs/usb_install.md).
+- Update a PRG32's firmware from the browser: [Update the firmware over USB](docs/firmware_flashing.md).
 - Publish a cartridge package: [Getting started](docs/getting_started.md) for
   the browser flow, or [Unified service API](docs/api.md) for the API flow.
 - Build firmware or prepare PlatformIO/ESP-IDF:

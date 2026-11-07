@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}PRG32 firmware - {{ store_name }}{% endblock %}
+
+{% block content %}
+<section class="usb-panel" id="firmwareFlash" aria-labelledby="firmwareTitle">
+  <h1 id="firmwareTitle">Update the PRG32 firmware over USB</h1>
+  <p>Write an official PRG32 firmware release onto an ESP32-C6 console from this page. Connect the console's
+     <strong>USB</strong> connector (not UART) to this computer and use Chrome or Edge. Only the bootloader, the
+     partition table and the firmware are written: the console keeps its Wi-Fi settings, its joystick calibration,
+     the cartridges in its eight slots and its scores.</p>
+  <p class="usb-note" id="firmwareUnsupported" hidden>This browser cannot reach USB devices. Open this page in Chrome
+     or Edge, over HTTPS or on this computer as <code>localhost</code>.</p>
+
+  <div class="usb-controls">
+    <label for="firmwareRelease">Release
+      <select id="firmwareRelease" disabled><option value="">Loading the releases…</option></select>
+    </label>
+    <label for="firmwareProfile">Pin profile
+      <select id="firmwareProfile" disabled></select>
+    </label>
+  </div>
+  <p id="firmwareDetails" class="usb-note"></p>
+  <p id="firmwareWarning" class="usb-status error" role="alert" hidden></p>
+
+  <label class="usb-confirm"><input type="checkbox" id="firmwareConfirm"> The pin profile matches how this console is
+    wired (see the <a href="https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/profiles/README.md">pin
+    profiles</a>).</label>
+  <details class="firmware-advanced">
+    <summary>Full erase</summary>
+    <label class="usb-confirm"><input type="checkbox" id="firmwareEraseAll"> Erase the whole flash first. This
+      <strong>deletes the Wi-Fi settings, all eight cartridges and the scores</strong> on the console.</label>
+  </details>
+  <button type="button" id="firmwareStart" disabled>Connect and write the firmware</button>
+  <progress id="firmwareProgress" max="100" value="0" hidden aria-label="Firmware writing progress"></progress>
+  <p class="usb-status" id="firmwareStatus" role="status" aria-live="polite"></p>
+  <pre class="usb-log" id="firmwareLog" hidden></pre>
+  <p class="usb-note">Releases come from
+    <a href="https://github.com/riscv-prg32/PRG32/releases">github.com/riscv-prg32/PRG32/releases</a>, through this
+    Store. Without a browser, use
+    <a href="https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/firmware_releases.md"><code>prg32_flash_release.py</code></a>.</p>
+</section>
+<script type="module" src="/static/js/firmware_flash.js"></script>
+{% endblock %}

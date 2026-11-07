@@ -71,6 +71,7 @@ Do not break existing firmware/tool clients:
 - `GET /api/multiplayer/status`
 - `WS /api/multiplayer`
 - `GET /.well-known/prg32-store.json`
+- `GET /api/firmware/releases`, `GET /api/firmware/releases/<tag>/<file>`
 
 The multiplayer relay must stay wire-compatible with `prg32-multiplayer-1.0`
 as specified in PRG32-Multiplayer-Server `docs/protocol.md`; see
@@ -88,6 +89,19 @@ instead of replacing existing ones.
   sending anything to a console, and never change the serial DTR/RTS lines.
 - Keep the service worker from caching `/api/` answers.
 - See [docs/usb_install.md](docs/usb_install.md).
+
+## Firmware Flashing
+
+- `/firmware` follows PRG32 `docs/usage/firmware_releases.md`
+  (`prg32-firmware-release-1.0`): verify every part's SHA-256, write each part
+  at its own offset, never erase NVS, cartridges or scores without the
+  explicit full-erase choice, and show a profile's `warning`.
+- Serve only files named in a validated manifest; never let the browser fetch
+  GitHub directly.
+- `static/vendor/esptool-js/` holds an unmodified `esptool-js` bundle; update it
+  only by replacing the file with a released `bundle.js`. Page code never sets
+  DTR or RTS: `esptool-js` does the resets.
+- See [docs/firmware_flashing.md](docs/firmware_flashing.md).
 
 ## Single Sign-On
 

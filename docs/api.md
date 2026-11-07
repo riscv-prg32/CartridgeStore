@@ -182,6 +182,17 @@ The response keeps the legacy top-level `games` list and adds a `pagination`
 object with `page`, `per_page`, `total`, `pages`, `has_next`, `has_prev`,
 `next_page`, and `prev_page`.
 
+## Firmware Releases
+
+PRG32 firmware releases, fetched from GitHub and served from the Store for the
+Firmware page; see [Update the firmware over USB](firmware_flashing.md#api).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/firmware/releases` | List firmware releases with a valid `prg32-firmware-release-1.0` manifest |
+| `GET` | `/api/firmware/releases/<tag>/prg32-firmware.json` | Fetch one release manifest |
+| `GET` | `/api/firmware/releases/<tag>/<file>.bin` | Fetch one flash part named in the manifest |
+
 ## Bundle Publish
 
 ```http

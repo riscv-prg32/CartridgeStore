@@ -42,6 +42,7 @@
         <li>{{ nav_link("/", "Store", "/games/") }}</li>
         <li>{{ nav_link("/scores", "Scores") }}</li>
         <li>{{ nav_link("/stats", "Stats") }}</li>
+        <li>{{ nav_link("/firmware", "Firmware") }}</li>
         <li>{{ nav_link("/publish", "Publish") }}</li>
         {% if current_user.authenticated and "editors" in current_user.groups %}
         <li>{{ nav_link("/editor/submissions", "Review", "/editor/") }}</li>
