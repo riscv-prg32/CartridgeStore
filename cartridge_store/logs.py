@@ -358,4 +358,3 @@ def events_for_actor(user_id: int) -> list[dict[str, Any]]:
             return []
         raise
     return [dict(row) for row in rows]
-
