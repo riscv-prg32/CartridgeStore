@@ -1,0 +1,176 @@
+name: prg32-standalone
+
+# Standalone deployment contract.
+#
+# This file intentionally has no external networks, proxy labels, host-port
+# publishing, Dream services, identity-provider services or SMTP fixture.
+# Use compose.direct.yaml for loopback-only diagnostics or compose.proxy.yaml
+# when an operator has explicitly created a reverse-proxy network.
+services:
+  fastify:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.operational
+    image: ${PRG32_FASTIFY_IMAGE:-prg32-cartridge-store-fastify:standalone}
+    environment:
+      NODE_ENV: production
+      PRG32_BACKEND_HOST: 0.0.0.0
+      PRG32_BACKEND_PORT: "5080"
+      PRG32_BACKEND_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_STORE_DATA: /data/canonical
+      PRG32_BACKEND_CATALOG_READ_MODE: canonical-operational
+      PRG32_BACKEND_CANONICAL_STORAGE_ROOT: /data/canonical
+      PRG32_BACKEND_CANONICAL_READ_AUTHORIZATION_FILE: /run/secrets/prg32-canonical-read-authorization
+      PRG32_BACKEND_CANONICAL_WORKFLOW_MODE: operational
+      PRG32_BACKEND_CANONICAL_WRITE_AUTHORIZATION_FILE: /run/secrets/prg32-canonical-write-authorization
+      PRG32_BACKEND_AUTH_WRITE_ENABLED: "true"
+      PRG32_BACKEND_AUTH_WRITE_MODE: operational
+      PRG32_BACKEND_AUTH_WRITE_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_AUTH_DISPOSABLE_ROOT: /data/canonical
+      PRG32_BACKEND_SESSION_SECRET_FILE: /run/secrets/prg32-session-secret
+      PRG32_BACKEND_BOOTSTRAP_TOKEN_FILE: /run/secrets/prg32-bootstrap-token
+      PRG32_BACKEND_SESSION_SECURE: "true"
+      PRG32_BACKEND_SESSION_SAMESITE: ${PRG32_SESSION_SAMESITE:-lax}
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_SESSION_COOKIE_DOMAIN:-}
+      PRG32_BACKEND_TRUST_PROXY: ${PRG32_TRUST_PROXY:?set true only when an approved reverse proxy is the sole ingress}
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_FRONTEND_PUBLIC_ORIGIN:?set the HTTPS storefront origin}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the HTTPS API origin}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the HTTPS API origin}
+      PRG32_BACKEND_CORS_ORIGINS: ${PRG32_FRONTEND_PUBLIC_ORIGIN:?set the HTTPS storefront origin}
+      PRG32_BACKEND_BACKUP_ENABLED: "false"
+      PRG32_BACKEND_SECRET_ENCRYPTION_ENABLED: "true"
+      PRG32_BACKEND_SECRET_KEY_REGISTRY: /run/secrets/prg32-secret-key-registry
+    volumes:
+      - type: bind
+        source: ${PRG32_DATA_DIR:?set an operator-controlled canonical data directory}
+        target: /data/canonical
+    networks:
+      - app_private
+    expose:
+      - "5080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    secrets:
+      - source: prg32_secret_key_registry
+        target: prg32-secret-key-registry
+      - source: prg32_canonical_read_authorization
+        target: prg32-canonical-read-authorization
+      - source: prg32_canonical_write_authorization
+        target: prg32-canonical-write-authorization
+      - source: prg32_session_secret
+        target: prg32-session-secret
+      - source: prg32_bootstrap_token
+        target: prg32-bootstrap-token
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5080/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  next:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.operational
+      args:
+        NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the HTTPS API origin}
+    image: ${PRG32_NEXT_IMAGE:-prg32-cartridge-store-next:standalone}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the HTTPS API origin}
+      NEXT_PUBLIC_PRG32_WS_URL: ${PRG32_WS_PUBLIC_URL:?set the public WebSocket URL}
+    depends_on:
+      fastify:
+        condition: service_healthy
+    networks:
+      - app_private
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  backup-scheduler:
+    profiles: ["backup-scheduler"]
+    build:
+      context: ../..
+      dockerfile: deploy/operations/backup/Dockerfile.scheduler
+      args:
+        PRG32_FASTIFY_IMAGE: ${PRG32_FASTIFY_IMAGE:-prg32-cartridge-store-fastify:standalone}
+    image: ${PRG32_BACKUP_SCHEDULER_IMAGE:-prg32-cartridge-store-backup-scheduler:standalone}
+    environment:
+      NODE_ENV: production
+      PRG32_BACKUP_SOURCE: /data/canonical
+      PRG32_BACKUP_DESTINATION: /data/backups
+      PRG32_BACKUP_WRAPPER: /app/backup/prg32-backup.mjs
+      PRG32_BACKUP_CLI_BIN: /app/dist/storage-v2/backup-v4-cli.js
+      PRG32_BACKUP_KEY_REGISTRY: /run/secrets/prg32-backup-key-registry
+      PRG32_BACKUP_AUTHORIZATION: ${PRG32_BACKUP_AUTHORIZATION:-}
+      PRG32_BACKUP_INTERVAL_MS: ${PRG32_BACKUP_INTERVAL_MS:-86400000}
+      PRG32_BACKUP_TIMEZONE: ${PRG32_BACKUP_TIMEZONE:-UTC}
+      PRG32_BACKUP_RUN_ON_START: ${PRG32_BACKUP_RUN_ON_START:-false}
+      PRG32_BACKUP_SNAPSHOT_MODE: ${PRG32_BACKUP_SNAPSHOT_MODE:-online}
+      PRG32_BACKUP_RETENTION_ENABLED: ${PRG32_BACKUP_RETENTION_ENABLED:-false}
+      PRG32_BACKUP_SCHEDULER_STATE_FILE: /data/backups/.prg32-scheduler-state.json
+    volumes:
+      - type: bind
+        source: ${PRG32_DATA_DIR:?set an operator-controlled canonical data directory}
+        target: /data/canonical
+        read_only: true
+      - type: bind
+        source: ${PRG32_BACKUP_DESTINATION_DIR:-../../.local/operational/backups}
+        target: /data/backups
+    secrets:
+      - source: prg32_secret_key_registry
+        target: prg32-backup-key-registry
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    network_mode: none
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/app/backup/scheduler.mjs", "--healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  app_private:
+    driver: bridge
+    internal: true
+
+secrets:
+  prg32_secret_key_registry:
+    file: ${PRG32_KEY_REGISTRY_FILE:?provide an external 0600 key registry file}
+  prg32_canonical_read_authorization:
+    file: ${PRG32_SECRET_DIR:?provide an external secret directory}/canonical-read-authorization
+  prg32_canonical_write_authorization:
+    file: ${PRG32_SECRET_DIR:?provide an external secret directory}/canonical-write-authorization
+  prg32_session_secret:
+    file: ${PRG32_SECRET_DIR:?provide an external secret directory}/session-secret
+  prg32_bootstrap_token:
+    file: ${PRG32_SECRET_DIR:?provide an external secret directory}/bootstrap-token

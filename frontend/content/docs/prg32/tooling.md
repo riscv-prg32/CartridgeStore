@@ -1,0 +1,121 @@
+---
+title: Tooling
+---
+
+# PRG32 Unified Tooling
+
+The PRG32 project ships with a unified Python package, `prg32`.
+
+You run the tooling as a module via Python:
+```bash
+python3 -m prg32 <command> [subcommand] [options]
+```
+
+> [!TIP]
+> The PRG32 CLI supports command and subcommand abbreviations! You can type unique prefixes instead of full names. For example, `python3 -m prg32 e b` is equivalent to `python3 -m prg32 esp32c6 build`.
+## Main Commands
+- `esp32c6`: ESP32C6 SoC tasks
+- `qemu`: QEMU emulator tasks
+- `cartridge`: Cartridge tasks (build, summary, etc.)
+- `abi`: ABI tooling tasks
+- `store`: CartridgeStore and metadata tasks
+- `doctor`: Check local toolchain prerequisites
+- `runtime`: Print runtime linker information
+- `debug`: Control an optional PRG32-QT debugger over its device HTTP API
+- `pins`: List available pin setup possibilities
+
+## ESP32C6 SoC Tasks (`esp32c6`)
+All commands interacting with physical ESP32-C6 hardware fall under the `esp32c6` group.
+
+### Firmware Operations
+- `build`: build the ESP32C6 firmware. Use `-p <name>` / `--pin-profile <name>` (or `--pins <name>`) to select the hardware pin configuration profile (e.g. `prototype1`, see the [PRG32 Profiles](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md#hardware-pin-profiles)). You can see all available pin setup possibilities with `python3 -m prg32 esp32c6 pins`. If no pin profile is supplied and no Custom Profile is configured in `sdkconfig`, the build command will fail fast. Use `-s` / `--skip-target` to decrease compilation time if the ESP32C6 target was already set (e.g. from a previous build). Use `-d` / `--debug` for debug profiles and `-e` / `--enable-heap-tracking` for heap task tracking.
+- `flash`: flash the ESP32C6 image. Does not do anything when a cartridge is running!
+    - `build-and-flash`: combination of `build` and `flash` commands for convenience. Also supports `-s` / `--skip-target`, `-p` / `--pin-profile`, `-d` / `--debug`, and `-e` / `--enable-heap-tracking`.
+- `pins`: list available pin setup possibilities discovered in `profiles/` (e.g. `prototype1`).
+- `erase-flash`: erase flash of ESP32C6. It is sometimes useful to completely erase the flash for debugging purposes.
+    - `reset`: erase flash and re-flash. Combination of `erase-flash` and `flash`, for convenience.
+- `memory`: get static and dynamic memory analysis of the ESP32C6 SoC (see the [memory guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/memory.md)).
+### Upload & Run Cartridges
+- `upload`: upload a cartridge to the ESP32C6 SoC over HTTP,
+- `run`: instruct the ESP32C6 over HTTP to run a previously loaded cartridge on a selected slot. Does not work when a cartridge is running (?).
+    - `upload-and-run`: combination of `upload` and `run` for convenience.
+### Firmware Tools
+These scripts are used to prepare and flashing single-file firmwares. They are useful to run legacy firmware for debugging purposes or to share modified versions of the firmware.
+
+- `prepare-firmware`: prepare a single-file legacy PRG32 firmware image for publishing
+- `flash-firmware`: flash a published single-file legacy PRG32 firmware image
+### Utilities
+- `performance`: download the latest in-RAM Performance Test JSON over HTTP.
+  Results contain paired RGB565/indexed measurements; preserve `color_mode`
+  when filtering or exporting case summaries. See
+  [Performance Test Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md)
+  for the complete workflow and [Performance Metrics](https://github.com/riscv-prg32/PRG32/blob/main/docs/measurement/metrics_api.md)
+  for fields.
+- `screenshot`: Get screenshot of ESP32C6 over HTTP.
+## QEMU Emulator Tasks (`qemu`)
+- `build`: build QEMU and generate the flash image. Use `-s` / `--skip-target` to decrease compilation time if the ESP32C3 target was already set (e.g. from a previous build).
+- `run`: run the QEMU emulator environment
+- `build-and-run`: build QEMU, generate flash image, and run the emulator. Also supports `-s` / `--skip-target`.
+- `upload`: upload a cartridge to QEMU. `--cart-ram-kib` sets the executable
+  RAM limit; by default it is read from `build-qemu/sdkconfig`, else 64 KiB
+  (see [PRG32 Profiles](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md#matching-host-tools-to-the-profile)).
+
+Two interactive helpers wrap `cartridge build` and QEMU staging for the
+graphics versions of the example games in `examples/games/`:
+
+- `python3 -m prg32.qemu.load_cart <game>|list`: build one game and stage it
+  into `build-qemu/qemu_flash.bin`.
+- `python3 -m prg32.qemu.start`: a menu that builds, stages, and runs a game.
+
+Both call `inject_cartridge()` in `prg32/qemu/upload_qemu.py`, the same
+validation and staging code used by `qemu upload`.
+
+Checked-in cartridge preview videos are recorded from real QEMU execution with
+`python3 tools/capture_cartridge_previews.py`. See
+[QEMU Screen Emulator](qemu.md#recording-cartridge-previews) for prerequisites,
+playfield cropping, UART audio capture, and regeneration details.
+
+For a complete workflow of making a cartridge run on QEMU, see [docs/qemu.md](qemu.md).
+## Cartridge Tasks (`cartridge`)
+- `build`: build a portable ABI-table `.prg32` cartridge from assembly or C
+  source code. Firmware-specific build options are rejected. `--cart-ram-kib`
+  sets the executable RAM limit (default 64; use 32 for the classroom profile,
+  see [PRG32 Profiles](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md#matching-host-tools-to-the-profile)).
+- `summary`: print the PRG32 cartridge summary (ABI, feature bits, etc.)
+
+For detailed instructions and examples on building cartridges, see the local
+[cartridge guide](/docs/prg32/cartridges).
+
+## ABI Tooling Tasks (`abi`)
+The `abi` command manages the `prg32_abi.json` definition and the generated code stubs (`prg32_abi_index.h`, `prg32_abi_hash.h`, etc.).
+
+- `gen`: generate PRG32 portable cartridge ABI C headers (e.g. `prg32_abi_index.h`) from the `prg32_abi.json` definition.
+- `check`: verify that the generated PRG32 ABI C headers perfectly match the current `prg32_abi.json` (typically used in CI to ensure developers didn't forget to run `gen`).
+## CartridgeStore and Metadata Tasks (`store`)
+Interactions with CartridgeStore (metadata attachment, discovery, publishing) are grouped under the `store` command.
+
+- `attach-metadata`: append or replace a PRG32META metadata trailer
+- `inspect-metadata`: print the PRG32META trailer summary for a cartridge
+- `discover`: find local CartridgeStore instances with mDNS
+- `list`: list cartridges from a CartridgeStore
+- `download`: download a cartridge from a CartridgeStore
+- `publish`: build and publish a cartridge bundle
+- `pack-bundle`: pack a flat CartridgeStore zip bundle
+- `publish-bundle`: publish a CartridgeStore zip bundle
+## Diagnostic Tasks
+- `doctor`: check local toolchain prerequisites
+- `runtime`: print runtime linker information
+- `debug`: query state or send `enable`, `disable`, `pause`, `step`, `resume`,
+  and playback `speed` commands to PRG32-QT. See the
+  [Web API reference](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/api.md#prg32-qt-optional-debugger-api).
+
+## GitHub Actions artifacts
+
+The repository workflow builds all six in-tree cartridges with the same unified
+CLI used locally. Every successful pull request or push to `main` or
+`development-c6` exposes separate downloadable cartridge artifacts for
+ESP32-C6 and QEMU. Blackjack and DeviceDemo also include Store bundles. See the
+[cartridge CI/CD documentation](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/cartridges.md#continuous-integration-and-delivery-artifacts)
+for validation and retention details.
+
+*(More details will be provided with `--help` on a need basis, e.g., `python3 -m prg32 cartridge build --help`)*

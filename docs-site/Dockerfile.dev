@@ -1,0 +1,16 @@
+FROM node:24-bookworm-slim
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+
+COPY docs-site/package.json docs-site/pnpm-lock.yaml docs-site/pnpm-workspace.yaml ./
+COPY docs-site/source.config.ts ./source.config.ts
+COPY frontend/content ./content
+RUN corepack enable && pnpm install --frozen-lockfile
+
+COPY docs-site .
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "pnpm install --frozen-lockfile && exec pnpm exec next dev --hostname 0.0.0.0"]

@@ -1,0 +1,16 @@
+{
+  "title": "PRG32 Platform",
+  "description": "Runtime, hardware, ABI, tooling, and platform references.",
+  "icon": "Cpu",
+  "root": true,
+  "pages": [
+    "index",
+    "getting-started",
+    "tooling",
+    "qemu",
+    "abi",
+    "cartridges",
+    "cartridge-store",
+    "score-api"
+  ]
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=PRG32 Cartridge Store local encrypted backup
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=prg32
+Group=prg32
+UMask=0077
+NoNewPrivileges=true
+EnvironmentFile=/etc/prg32/cartridge-store-backup.env
+ExecStart=/usr/bin/env sh /opt/prg32-cartridge-store/deploy/operations/backup/scheduling/run-backup.sh
+# The wrapper verifies the encrypted archive before publication. Retention is
+# deliberately not part of this scheduled unit and remains operator-approved.

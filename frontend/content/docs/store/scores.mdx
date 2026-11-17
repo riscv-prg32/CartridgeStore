@@ -1,0 +1,19 @@
+---
+title: Scores
+description: Read and submit score records without merging player names with authenticated identities.
+---
+
+`GET /api/scores` returns score records. The Store orders results by score descending and then `created_at` ascending, so the Scoreboard presents the returned order rather than calculating a new ranking algorithm.
+
+```http
+GET /api/scores?game=pong&player=Ada&limit=20
+```
+
+| Field | Meaning |
+| --- | --- |
+| `game` | Cartridge/game identifier supplied by the client |
+| `player` | Player label supplied with the score |
+| `score` | Unsigned 32-bit score value |
+| `created_at` | Unix timestamp assigned by the Store |
+
+Anonymous player labels, authenticated users, and firmware player identifiers are distinct concepts. The UI displays the `player` field as submitted and does not infer account ownership.

@@ -1,0 +1,20 @@
+# Disposable-only override for local acceptance. It uses the production
+# operational images with synthetic configuration, binds only loopback ports,
+# and is never suitable for deployment.
+services:
+  fastify:
+    environment:
+      NODE_ENV: test
+      PRG32_BACKEND_SESSION_SECURE: "false"
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: https://store.standalone.test
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: https://api.standalone.test
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: https://api.standalone.test
+      PRG32_BACKEND_CORS_ORIGINS: https://store.standalone.test
+    ports:
+      - "127.0.0.1:${PRG32_TEST_FASTIFY_HOST_PORT:-15080}:5080"
+
+  next:
+    environment:
+      NEXT_PUBLIC_PRG32_WS_URL: ws://127.0.0.1:${PRG32_TEST_FASTIFY_HOST_PORT:-15080}/api/multiplayer
+    ports:
+      - "127.0.0.1:${PRG32_TEST_NEXT_HOST_PORT:-13000}:3000"

@@ -1,0 +1,17 @@
+{
+  "title": "Cartridge Store",
+  "description": "Publishing, catalog, APIs, scores, metrics, and multiplayer.",
+  "icon": "Store",
+  "root": true,
+  "pages": [
+    "index",
+    "getting-started",
+    "cartridge-format",
+    "metadata",
+    "publishing",
+    "multiplayer",
+    "scores",
+    "metrics",
+    "store-api"
+  ]
+}

@@ -1,0 +1,68 @@
+services:
+  backend:
+    environment:
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_STORE_ORIGIN:-https://${PRG32_STORE_DOMAIN:?set the storefront hostname}}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_API_ORIGIN:-https://${PRG32_API_DOMAIN:?set the API hostname}}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_API_ORIGIN:-https://${PRG32_API_DOMAIN:?set the API hostname}}
+      PRG32_BACKEND_CORS_ORIGINS: ${PRG32_STORE_ORIGIN:-https://${PRG32_STORE_DOMAIN:?set the storefront hostname}}
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_SESSION_COOKIE_DOMAIN:?set the session cookie domain}
+    networks:
+      - app
+      - mail
+      - dream_edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-api.rule: Host(`${PRG32_API_DOMAIN:?set the API hostname}`)
+      traefik.http.routers.prg32-api.entrypoints: websecure
+      traefik.http.routers.prg32-api.tls: "true"
+      traefik.http.routers.prg32-api.middlewares: dream-security-headers@file
+      traefik.http.services.prg32-api.loadbalancer.server.port: "5090"
+
+  next:
+    environment:
+      PRG32_STORE_DOMAIN: ${PRG32_STORE_DOMAIN:?set the storefront hostname}
+      NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_ORIGIN:-https://${PRG32_API_DOMAIN:?set the API hostname}}
+      NEXT_PUBLIC_PRG32_STORE_ORIGIN: ${PRG32_STORE_ORIGIN:-https://${PRG32_STORE_DOMAIN:?set the storefront hostname}}
+    networks:
+      - app
+      - dream_edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-store.rule: Host(`${PRG32_STORE_DOMAIN:?set the storefront hostname}`)
+      traefik.http.routers.prg32-store.entrypoints: websecure
+      traefik.http.routers.prg32-store.tls: "true"
+      traefik.http.routers.prg32-store.priority: "1"
+      traefik.http.routers.prg32-store.middlewares: dream-security-headers@file
+      traefik.http.services.prg32-store.loadbalancer.server.port: "3000"
+
+  docs:
+    environment:
+      PRG32_STORE_DOMAIN: ${PRG32_STORE_DOMAIN:?set the storefront hostname}
+      NEXT_PUBLIC_PRG32_STORE_ORIGIN: ${PRG32_STORE_ORIGIN:-https://${PRG32_STORE_DOMAIN:?set the storefront hostname}}
+    networks:
+      - app
+      - dream_edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-docs.rule: "Host(`${PRG32_STORE_DOMAIN:?set the storefront hostname}`) && (Path(`/docs`) || PathPrefix(`/docs/`))"
+      traefik.http.routers.prg32-docs.entrypoints: websecure
+      traefik.http.routers.prg32-docs.tls: "true"
+      traefik.http.routers.prg32-docs.priority: "100"
+      traefik.http.routers.prg32-docs.middlewares: dream-security-headers@file
+      traefik.http.services.prg32-docs.loadbalancer.server.port: "3000"
+
+  # The Dream Platform Traefik edge owns ports 80/443 in this mode.
+  nginx:
+    profiles:
+      - standalone
+
+networks:
+  dream_edge:
+    name: ${DREAM_EDGE_NETWORK:-dream_edge}
+    external: true
+  mail:
+    name: ${DREAM_MAIL_NETWORK:-dream_mail}
+    external: true

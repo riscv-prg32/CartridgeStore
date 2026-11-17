@@ -1,0 +1,34 @@
+# PRG32-owned local Dream integration overlay.
+#
+# This overlay persists optional network attachments and Mailpit access across
+# application container recreation. It deliberately does not claim public
+# Traefik routers. Use a separately approved, isolated route overlay for local
+# m549 browser diagnostics when those routes are required.
+services:
+  fastify:
+    environment:
+      PRG32_BACKEND_EMAIL_TRANSPORT: ${PRG32_DREAM_EMAIL_TRANSPORT:-smtp}
+      PRG32_BACKEND_EMAIL_SMTP_HOST: ${PRG32_DREAM_SMTP_HOST:-mailpit}
+      PRG32_BACKEND_EMAIL_SMTP_PORT: ${PRG32_DREAM_SMTP_PORT:-1025}
+      PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST: ${PRG32_DREAM_SMTP_HOST:-mailpit}
+    networks:
+      - app_private
+      - dream_edge
+      - dream_mail
+    labels:
+      traefik.enable: "false"
+
+  next:
+    networks:
+      - app_private
+      - dream_edge
+    labels:
+      traefik.enable: "false"
+
+networks:
+  dream_edge:
+    name: ${DREAM_EDGE_NETWORK:-dream_edge}
+    external: true
+  dream_mail:
+    name: ${DREAM_MAIL_NETWORK:-dream_mail}
+    external: true

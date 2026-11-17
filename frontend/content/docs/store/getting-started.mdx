@@ -1,0 +1,30 @@
+---
+title: Getting started
+description: Understand the PRG32 platform, its two supported execution targets, and the Store workflow.
+---
+
+PRG32 cartridges are small applications packaged for the Store. A cartridge can target physical ESP32-C6 hardware, QEMU, or both.
+
+## Use the Store
+
+1. Browse published cartridges from [Explore](/explore).
+2. Open a cartridge and select a version and architecture.
+3. Download the binary that matches the target you are running.
+4. Use the developer workspace to submit a bundle when your account has publishing permission.
+
+## Local development
+
+Start the services with Docker:
+
+```bash
+source "$HOME/.nvm/nvm.sh"
+nvm use 24
+cp .env.example .env
+./deploy/local/setup-tls.sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+```
+
+Open `https://store.prg32.test` for the Store, `https://store.prg32.test/docs`
+for the documentation hub and `https://api.prg32.test/ready` to confirm the API.
+
+For the firmware toolchain and board setup, follow the [PRG32 getting-started guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/getting_started.md).

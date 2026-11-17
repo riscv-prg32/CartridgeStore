@@ -1,0 +1,91 @@
+name: prg32-candidate
+
+services:
+  fastify:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.candidate
+    image: prg32-cartridge-store-fastify:candidate
+    environment:
+      NODE_ENV: development
+      PRG32_BACKEND_HOST: 0.0.0.0
+      PRG32_BACKEND_PORT: 5090
+      PRG32_BACKEND_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_STORE_DATA: /data/canonical
+      PRG32_BACKEND_CATALOG_READ_MODE: canonical-disposable
+      PRG32_BACKEND_CANONICAL_STORAGE_ROOT: /data/canonical
+      PRG32_BACKEND_CANONICAL_READ_AUTHORIZATION: M5.2G1-DISPOSABLE-CANONICAL-READ
+      PRG32_BACKEND_CANONICAL_WORKFLOW_MODE: disposable
+      PRG32_BACKEND_CANONICAL_WRITE_AUTHORIZATION: M5.2G2-DISPOSABLE-CANONICAL-WRITE
+      PRG32_BACKEND_CANDIDATE_MODE: two-service-disposable
+      PRG32_BACKEND_CANDIDATE_AUTHORIZATION: M5.2G9-DISPOSABLE-TWO-SERVICE-CANDIDATE
+      PRG32_BACKEND_AUTH_WRITE_ENABLED: "true"
+      PRG32_BACKEND_AUTH_WRITE_MODE: test
+      PRG32_BACKEND_AUTH_WRITE_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_AUTH_DISPOSABLE_ROOT: /data/canonical
+      PRG32_BACKEND_SESSION_SECRET: ${PRG32_CANDIDATE_SESSION_SECRET:-m52g9-disposable-session-secret-rotate-me}
+      PRG32_BACKEND_BOOTSTRAP_TOKEN: ${PRG32_CANDIDATE_BOOTSTRAP_TOKEN:-m52g10-disposable-bootstrap-token-rotate-me}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_CANDIDATE_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_CANDIDATE_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_CANDIDATE_STORE_ORIGIN:-https://store.prg32.test}
+      PRG32_BACKEND_SESSION_SECURE: "false"
+      PRG32_BACKEND_SESSION_SAMESITE: lax
+      PRG32_BACKEND_BACKUP_ENABLED: "false"
+      PRG32_BACKEND_MDNS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${PRG32_CANDIDATE_FASTIFY_PORT:-5092}:5090"
+    volumes:
+      - type: bind
+        source: ${PRG32_CANDIDATE_DATA_DIR:-../../.local/candidate/canonical}
+        target: /data/canonical
+    networks:
+      - candidate
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5090/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  next:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.candidate
+      args:
+        NEXT_PUBLIC_PRG32_API_ORIGIN: http://fastify:5090
+    image: prg32-cartridge-store-next:candidate
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_PRG32_API_ORIGIN: http://fastify:5090
+      NEXT_PUBLIC_PRG32_WS_URL: ws://127.0.0.1:${PRG32_CANDIDATE_FASTIFY_PORT:-5092}/api/multiplayer
+    depends_on:
+      fastify:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PRG32_CANDIDATE_NEXT_PORT:-3300}:3000"
+    networks:
+      - candidate
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://' + require('node:os').hostname() + ':3000/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+networks:
+  candidate:
+    driver: bridge

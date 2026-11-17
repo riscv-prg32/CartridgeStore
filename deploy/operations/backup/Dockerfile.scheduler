@@ -1,0 +1,14 @@
+ARG PRG32_FASTIFY_IMAGE=prg32-cartridge-store-fastify:standalone
+FROM ${PRG32_FASTIFY_IMAGE}
+
+USER root
+WORKDIR /app
+
+COPY deploy/operations/backup/prg32-backup.mjs /app/backup/prg32-backup.mjs
+COPY deploy/operations/backup/scheduler.mjs /app/backup/scheduler.mjs
+
+RUN chmod 0555 /app/backup/prg32-backup.mjs /app/backup/scheduler.mjs \
+    && chown -R node:node /app/backup
+
+USER node
+ENTRYPOINT ["node", "/app/backup/scheduler.mjs"]

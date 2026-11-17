@@ -1,168 +1,71 @@
 # Deployment
 
-PRG32 Cartridge Store should run behind HTTPS in production, with persistent
-storage mounted outside the container or process directory.
+Deployment templates use the Fastify API and Next.js frontend behind an
+operator-controlled reverse proxy. Local development additionally runs the
+standalone Fumadocs service and recommends the repository-owned Traefik edge;
+the Nginx edge remains available as an alternative.
 
-## Environment Variables
+## Local and production hosts
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `SECRET_KEY` | required | Flask session signing key |
-| `PRG32_STORE_DATA` | `data` or `/data` in Docker | Cartridge files, custom static assets, and default DB location |
-| `PRG32_STORE_DB` | `<data>/cartridge_store.sqlite` | Unified SQLite database |
-| `PRG32_ADMIN_PASSWORD` | `password` | Initial password for the seeded `admin` account (used only while no admin exists) |
-| `PRG32_SCORE_DB` | unset | Legacy score DB fallback |
-| `PRG32_METRICS_DB` | unset | Legacy metrics DB fallback |
-| `PRG32_BUNDLE_MAX_MB` | `64` | Zip bundle upload limit |
-| `PRG32_MP_MAX_PEERS` | `8` | WebSocket peers per multiplayer room |
-| `PRG32_MP_DEVICE_ID_SECRET` | derived from `SECRET_KEY` | Key for multiplayer device pseudonyms; keep it stable so a console keeps its public ID |
-| `PRG32_MP_MAX_MESSAGE_BYTES` | `1024` | Largest multiplayer message |
-| `PRG32_MP_MAX_RATE` | `40` | Multiplayer messages per second per connection before the socket is closed |
-| `PRG32_MP_IDLE_TIMEOUT` | `15` | Seconds of silence before a multiplayer socket is closed |
-| `PRG32_THREADS` | `128` | Gunicorn threads; each open multiplayer WebSocket holds one |
-| `PRG32_BIND` | `0.0.0.0:5080` | Gunicorn bind address |
-| `PRG32_USERS` | unset | Legacy `name:role:token` compatibility tokens |
-| `PRG32_SMTP_HOST` | unset | SMTP host for registration emails |
-| `PRG32_SMTP_PORT` | `587` | SMTP port |
-| `PRG32_SMTP_FROM` | `noreply@localhost` | Registration email sender |
-| `PRG32_SMTP_USER` | unset | SMTP username |
-| `PRG32_SMTP_PASSWORD` | unset | SMTP password |
-| `PRG32_SMTP_TLS` | `true` | Enable STARTTLS for SMTP |
-| `PRG32_MDNS_DISABLED` | unset | Set to `1` to disable mDNS advertisement |
-| `PRG32_MDNS_NAME` | `PRG32 Cartridge Store` | mDNS instance name |
-| `PRG32_MDNS_TYPE` | `_prg32store._tcp.local.` | mDNS service type |
-| `PRG32_MDNS_PORT` | `5080` | mDNS advertised HTTP port |
-| `PRG32_SSO_SECRET` | unset | Shared secret (32+ characters) for user sync and single sign-on with a Construction Kit |
-| `PRG32_SSO_PEER_URL` | unset | The linked PRG32-Construction-Kit address, e.g. `http://kit.school.lan:5090` |
-| `PRG32_SSO_TIMEOUT` | `5` | Seconds to wait for the linked kit |
-| `PRG32_LDAP_URL` | unset | LDAP activation URL |
-| `PRG32_LDAP_BASE_DN` | unset | LDAP search base |
-| `PRG32_LDAP_BIND_DN` | unset | LDAP service account DN |
-| `PRG32_LDAP_BIND_PW` | unset | LDAP service account password |
-| `PRG32_LDAP_USER_ATTR` | `uid` | LDAP username attribute |
-| `PRG32_LDAP_ADMIN_GROUP` | unset | LDAP admin group DN |
-| `PRG32_OIDC_ENABLED` | unset | Set to `true` to enable OIDC |
-| `PRG32_OIDC_ISSUER` | unset | OIDC issuer discovery URL |
-| `PRG32_OIDC_CLIENT_ID` | unset | OIDC client id |
-| `PRG32_OIDC_CLIENT_SECRET` | unset | OIDC client secret |
-| `PRG32_OIDC_SCOPE` | `openid email profile` | OIDC scopes |
-| `PRG32_SAML_ENABLED` | unset | Set to `true` to enable SAML2 |
-| `PRG32_SAML_ENTITY_ID` | unset | SAML service-provider entity id |
-| `PRG32_SAML_ACS_URL` | unset | SAML assertion consumer URL |
-| `PRG32_SAML_SLS_URL` | unset | SAML single logout URL |
-| `PRG32_SAML_IDP_ENTITY_ID` | unset | SAML identity-provider entity id |
-| `PRG32_SAML_IDP_SSO_URL` | unset | SAML identity-provider SSO URL |
-| `PRG32_SAML_IDP_SLO_URL` | unset | SAML identity-provider logout URL |
-| `PRG32_SAML_IDP_X509CERT` | unset | SAML identity-provider signing certificate |
-| `PRG32_SECURE_COOKIES` | `false` | Set to `true` behind production HTTPS so browsers only send session cookies over TLS |
+The local dnsmasq setup resolves these development-only hosts. The generic
+Traefik overlay terminates TLS and routes them; the root Compose file can also
+be combined with the optional Nginx profile or the optional Dream integration:
 
-## Production Checklist
+| Local host | Service |
+| --- | --- |
+| `store.prg32.test` | Next.js storefront |
+| `api.prg32.test` | Fastify API and WebSocket relay |
 
-- Set a high-entropy `SECRET_KEY`.
-- Change the seeded `admin` / `password` administrator credentials.
-- Configure SMTP so user registration links are delivered by email.
-- Configure mDNS, SMTP, OIDC, and SAML2 from `/setup` or environment variables.
-- Disable Flask debug mode; use Gunicorn or the Docker image.
-- Put the service behind HTTPS termination. Game pages can install cartridges
-  on a PRG32 over USB only on HTTPS (or `localhost`); see
-  [Install over USB](usb_install.md).
-- Set `PRG32_SECURE_COOKIES=true` after HTTPS is in place.
-- Complete every hard requirement in [GDPR and privacy operations](gdpr.md),
-  including controller contacts, lawful bases, retention, processor terms,
-  rights handling, backup expiry, incident response, and any required DPIA.
-- Schedule `flask --app app:app privacy-cleanup` at least daily and monitor its
-  exit status plus `/admin/privacy`.
-- Preserve `PRG32_STORE_DATA` on durable storage.
-- Use `/admin/backup` for full backups, or back up `cartridge_store.sqlite`,
-  `index.json`, `cartridges/`, custom static assets, and pending submissions
-  under `pending/`.
-- Configure reverse-proxy request size limits above `PRG32_BUNDLE_MAX_MB`.
-- Proxy WebSocket upgrades for `/api/multiplayer`.
-- Run Gunicorn with `--config gunicorn.conf.py`: one worker (multiplayer rooms
-  live in memory) and enough threads for every open WebSocket plus HTTP traffic.
-- Keep `zeroconf` installed if you want mDNS advertisement in production.
+The Store host also serves `/docs` through the separate Fumadocs container.
 
-Example Nginx WebSocket location:
+Do not publish those names as production URLs. Production runs on a different
+server and must set its own registered hostnames and HTTPS origins before
+starting `deploy/operational/compose.yaml`:
 
-```nginx
-location /api/multiplayer {
-    proxy_pass http://127.0.0.1:5080;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-}
-```
+| Variable | Production value |
+| --- | --- |
+| `PRG32_STORE_DOMAIN` | Store hostname used by the selected edge |
+| `PRG32_API_DOMAIN` | API hostname used by the selected edge |
+| `PRG32_FRONTEND_PUBLIC_ORIGIN` | Full HTTPS storefront origin |
+| `PRG32_API_PUBLIC_ORIGIN` | Full HTTPS API origin |
+| `PRG32_API_WS_URL` | Full `wss://` multiplayer endpoint |
+| `PRG32_COOKIE_DOMAIN` | Cookie domain matching the production host policy |
 
-## Docker
+TLS terminates at the reverse proxy. The API validates the configured public
+origins and trusts forwarded headers only when `PRG32_BACKEND_TRUST_PROXY` is
+explicitly enabled.
 
-Compose requires `SECRET_KEY`:
+## Persistent data and secrets
 
-```bash
-export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-docker compose up --build
-```
+Mount the canonical data directory at `/data/canonical`. It contains SQLite,
+cartridge objects, publication state and managed assets. Do not mount a host
+path from the repository for a production deployment.
 
-The image continues if `zeroconf` is absent, but mDNS advertisement is disabled
-with a startup warning.
+Use Docker secrets for the session secret, bootstrap token, canonical read/write
+authorizations and encrypted secret key registry.
 
-### Scheduled privacy cleanup
+Keep the container filesystem read-only, drop capabilities, and provide a
+small writable `/tmp` tmpfs as shown in the deployment templates.
 
-Cron example for a Python deployment:
+## Health checks
 
-```cron
-17 2 * * * cd /srv/cartridge-store && .venv/bin/flask --app app:app privacy-cleanup
-```
-
-Equivalent systemd units can use `Type=oneshot` with
-`ExecStart=/srv/cartridge-store/.venv/bin/flask --app app:app privacy-cleanup`
-and a timer with `OnCalendar=daily`, `Persistent=true`, the same working
-directory, environment, service account, and data-volume permissions as the
-web service.
-
-Docker Compose host-timer example:
-
-```bash
-docker compose exec -T cartridge-store flask --app app:app privacy-cleanup
-```
-
-For Kubernetes, run the same command in a daily `CronJob` using the production
-image, database, data volume, secrets, and environment. Only one cleanup job
-should run at a time. Test first with `--dry-run`; a failure returns a non-zero
-status and is recorded for the privacy-readiness page.
-
-## Continuous Integration and Delivery
-
-GitHub Actions validates every pull request to `main` and every push to `main`:
-
-- compiles and tests the application on Python 3.11, 3.12, and 3.13;
-- audits Python dependencies for known vulnerabilities;
-- validates the Compose configuration;
-- builds the production image and starts it for a discovery-endpoint smoke test;
-- runs CodeQL analysis on pushes, pull requests, and a weekly schedule.
-
-After all CI jobs pass, trusted pushes publish multi-architecture `linux/amd64`
-and `linux/arm64` images to GitHub Container Registry. A push to `main` updates
-the `latest`, `edge`, and `sha-<commit>` tags. A tag such as `v1.2.3` publishes
-`1.2.3`, `1.2`, `1`, and `sha-<commit>`. Published images include GitHub build
-provenance attestations.
-
-The package name is derived from the repository and is available as:
+Route traffic only after:
 
 ```text
-ghcr.io/riscv-prg32/cartridgestore
+GET http://backend:5080/health -> 200
+GET http://backend:5080/ready  -> 200
+GET http://next:3000/health    -> 200
 ```
 
-The repository's Actions settings must allow read/write workflow permissions
-so the built-in `GITHUB_TOKEN` can publish packages and attestations. Configure
-the `main` branch protection rule to require the Python matrix, dependency
-audit, container smoke test, and CodeQL checks before merging.
+The public reverse proxy must preserve WebSocket upgrades for
+`/api/multiplayer`.
 
-Dependabot checks Python packages, the Docker base image, and workflow actions
-weekly. Creating a release only requires pushing a semantic-version tag after
-the corresponding commit has passed CI:
+## Verification
 
 ```bash
-git tag v1.2.3
-git push origin v1.2.3
+docker compose -f deploy/operational/compose.yaml config
+docker compose -f deploy/standalone/compose.yaml config
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml config
+docker build -f backend/Dockerfile.operational -t prg32-cartridge-store-backend:local backend
+docker build -f frontend/Dockerfile.operational -t prg32-cartridge-store-frontend:local frontend
 ```

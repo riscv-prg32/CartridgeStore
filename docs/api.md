@@ -1,7 +1,34 @@
 # Unified Service API
 
+This is the public compatibility contract served by the Fastify API. See
+[Architecture](architecture.md) for route ownership and the compatibility
+evidence in the repository test suites.
+
 PRG32 Cartridge Store combines cartridge catalog, score, metrics, multiplayer,
 authentication, and statistics contracts on one host.
+
+## Firmware flashing over USB
+
+The public Store page `/firmware` exposes the official PRG32 ESP32-C6 release
+flow. It uses Chrome or Edge Web Serial and never writes a board until the
+browser has checked the release format, selected pin profile, file size, and
+SHA-256 for every flash part. The normal profile writes only bootloader,
+partition table, and application data; the optional full erase is explicitly
+confirmed because it removes Wi-Fi settings, cartridges, and scores.
+
+The Fastify backend proxies and caches release assets from
+`riscv-prg32/PRG32`, which avoids browser CORS problems and gives the page a
+same-origin integrity boundary:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/firmware/releases` | List valid ESP32-C6 releases and pin profiles |
+| `GET` | `/api/firmware/releases/<tag>/prg32-firmware.json` | Return the validated release manifest |
+| `GET` | `/api/firmware/releases/<tag>/<part>.bin` | Serve a manifest-listed, SHA-256-verified flash part |
+
+The firmware flashing page is intentionally separate from the cartridge
+download flow. Multiplayer remains integrated in this same Store service and
+continues to use `/api/multiplayer` and `/api/multiplayer/status`.
 
 ## Discovery
 
@@ -14,39 +41,32 @@ The `services` object includes `cartridges`, `bundle_publish`, `submissions`,
 advertisement is enabled, the service is announced as `_prg32store._tcp.local.`
 with TXT record `abi=prg32-store-discovery-1.0`.
 
+The discovery response also exposes `api_version`, `api_base`, `api_versions`,
+and `services_v1`. Firmware clients must use the stable version advertised in
+those fields. The complete firmware contract is documented in
+[PRG32 Store API versioning](firmware-api-versioning.md).
+
+The canonical first-generation API prefix is `/api/v1`. Existing `/api/...`
+paths remain compatibility aliases and execute the same handlers.
+
 ## Authentication
 
-The server requires `SECRET_KEY` and uses Flask signed-cookie sessions for
-browser login. A default administrator account is created with username
-`admin` and password `password`; change that password before using the service
-outside a throwaway classroom demo. New users start at `/auth/register` by
-entering only an email address. The server sends a verification link; following
-that link lets the user set a password. The account username is the verified
-email address.
+The server uses signed-cookie sessions for browser login. Fresh installations
+require an operator-supplied,
+one-time `PRG32_BOOTSTRAP_TOKEN`; no known administrator password is created.
+Existing administrator credentials, IDs, groups, and roles are preserved.
+New users start at `/auth/register` by entering only an email address. The
+server sends a verification link; following that link lets the user set a
+password. The account username is the verified email address.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET/POST` | `/auth/register` | Request an email verification link |
 | `GET/POST` | `/auth/register/complete` | Complete registration from the emailed link |
+| `GET` | `/auth/csrf` | Get a session-bound CSRF token for browser/Next mutations |
+| `POST` | `/auth/bootstrap` | One-time first administrator setup using the operator header secret |
 | `GET/POST` | `/auth/login` | Authenticate and set the session cookie |
 | `POST` | `/auth/logout` | Clear the session |
-| `GET` | `/privacy` | Versioned public privacy notice |
-| `GET` | `/account/privacy` | Signed-in user's privacy dashboard |
-| `GET` | `/api/me/export` | Machine-readable personal-data export |
-| `POST` | `/account/delete` | Erase the signed-in account after `confirmation=DELETE` |
-| `POST` | `/admin/privacy/cleanup` | Run configured retention cleanup (administrator) |
-
-Browser forms include a per-session CSRF token. JSON requests and authenticated
-Bearer-token clients retain the existing API contract; cookie-authenticated
-HTML/form clients must submit the web interface's `csrf_token`. Personal-data
-export requires recent authentication. Local account erasure submits
-`confirmation=DELETE` and the current `password`.
-
-Account email and login username are private. Public response fields such as
-`submitted_by`, `published_by`, and profile route names contain the separate
-safe public handle. Existing email-based profile URLs remain available only to
-that account and administrators during migration; anonymous requests receive a
-not-found response.
 | `GET` | `/auth/me` | Current user JSON |
 | `GET` | `/auth/tokens` | List your Bearer tokens or open the token manager |
 | `POST` | `/auth/tokens` | Create a Bearer token |
@@ -67,6 +87,29 @@ curl -X POST http://host:5080/auth/tokens \
   -d '{"label":"board"}'
 ```
 
+First-run bootstrap (send the secret only in the header; it is never returned
+or logged):
+
+```bash
+export PRG32_BOOTSTRAP_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+curl -X POST http://host:5080/auth/bootstrap \
+  -H "X-PRG32-Bootstrap-Token: $PRG32_BOOTSTRAP_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","email":"admin@example.test","password":"replace-with-a-unique-password","password_confirm":"replace-with-a-unique-password"}'
+```
+
+The endpoint returns `409` after the first successful setup or when an
+administrator already exists. Keep the operator secret out of shell history,
+CI logs, Compose files, and source control; unset it after setup if the
+deployment does not need to recover a fresh database.
+
+Cookie-authenticated state-changing requests require the session CSRF token.
+HTML forms receive a hidden `csrf_token` field. JSON clients should call
+`GET /auth/csrf` and send `X-CSRFToken`; a valid Bearer/API-token-only request
+does not require a browser CSRF token. Missing or invalid tokens return HTTP
+403 with `code: "csrf_failed"`. Firmware ingestion endpoints remain compatible
+for their existing anonymous and Bearer clients.
+
 Use it:
 
 ```bash
@@ -83,9 +126,9 @@ Routes requiring auth:
 | `POST /api/submissions/<id>/verify` | `editors` group |
 | `POST /api/submissions/<id>/reject` | `editors` group |
 | `POST /api/scores` | logged in or Bearer token |
-| `/setup`, `/setup/logo`, `/setup/favicon` | admin |
-| `/admin/users*`, `/admin/groups*`, `/admin/roles`, `/admin/backup*` | admin |
-| `/admin/cartridges*` | admin or `editors` group |
+| `/api/setup/*`, `/api/admin/settings*`, `/api/admin/settings/assets/*` | admin |
+| `/api/admin/users*`, `/api/admin/groups*`, `/api/admin/roles`, `/admin/backup*` | admin |
+| `/api/admin/cartridges*` | admin or `editors` group |
 | `/users/<username>/runs*` | owner or admin |
 
 Metrics ingestion remains compatible with existing clients. If a run is posted
@@ -101,48 +144,48 @@ OIDC and SAML2 can be enabled from `/setup` or environment variables. On a
 successful federated login, the service creates or updates a local user with
 the external provider id and email address.
 
-## Single sign-on with PRG32-Construction-Kit
-
-Only when `PRG32_SSO_SECRET` and `PRG32_SSO_PEER_URL` are set; see
-[accounts_and_sso.md](accounts_and_sso.md).
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET/POST` | `/api/sso/users` | Signed requests from the linked kit: list / apply user records |
-| `POST` | `/admin/sso/sync` | Admin: send waiting changes, then merge all users both ways |
-| `GET` | `/auth/sso/peer?next=/path` | Open the linked kit already signed in |
-| `POST` | `/auth/sso/accept` | Receives a one-time login ticket from the kit |
-
-`POST /api/publish` and `POST /api/publish/bundle` also accept a one-time
-API ticket from the linked kit as the Bearer token (`Bearer sso1....`); the
-cartridge is published as the user named in the ticket. `/api/me` and
-`/.well-known/prg32-store.json` gain an optional `sso` field:
-`{"enabled": true, "abi": "prg32-sso-1.0"}`.
-
 ## Administration
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET/POST` | `/setup` | Edit store, auth, publish, mDNS, SMTP, OIDC, and SAML2 settings |
-| `GET/POST` | `/admin/users` | List and create users |
-| `POST` | `/admin/users/<id>` | Update username, email, role, password, and groups |
-| `DELETE` | `/admin/users/<id>` | Delete a user |
-| `POST` | `/admin/users/<id>/delete` | Browser delete fallback |
-| `GET/POST` | `/admin/groups` | List and create groups |
-| `POST` | `/admin/groups/<id>` | Rename a group |
-| `DELETE/POST` | `/admin/groups/<id>/delete` | Delete a group |
-| `GET` | `/admin/roles` | List fixed roles and user counts |
-| `GET` | `/admin/cartridges` | List cartridges for administration |
-| `POST` | `/admin/cartridges/<id>/<version>` | Edit title, summary, and tags |
-| `DELETE/POST` | `/admin/cartridges/<id>/<version>/delete` | Delete a variant or version |
+| `GET/POST` | `/api/setup/*` | Read setup state and complete first-run setup |
+| `GET/POST` | `/api/admin/users` | List and create users |
+| `GET/PATCH` | `/api/admin/users/<id>` | Read or update username, email and password |
+| `DELETE` | `/api/admin/users/<id>` | Delete a user |
+| `GET/POST` | `/api/admin/groups` | List and create groups |
+| `POST/DELETE` | `/api/admin/groups/<id>` | Rename or delete a group |
+| `GET` | `/api/admin/roles` | List fixed roles and user counts |
+| `GET` | `/api/admin/cartridges` | List cartridges for administration |
+| `PATCH/POST` | `/api/admin/cartridges/<id>` | Edit title, summary and tags |
+| `DELETE` | `/api/admin/cartridges/<id>` | Delete a variant or version |
 | `GET` | `/admin/backup` | Backup/restore page |
 | `GET` | `/admin/backup/download` | Download a full backup ZIP |
 | `POST` | `/admin/backup/restore` | Restore a full backup ZIP |
-| `GET` | `/admin/logs` | Event log with level, category, text and date filters |
-| `GET` | `/admin/logs.csv` | Export the filtered event log as CSV |
-| `GET` | `/api/admin/logs` | Event log and in-memory process log as JSON (`limit`, `offset`) |
-| `GET` | `/admin/stats` | Administrator statistics dashboard |
-| `GET` | `/api/admin/stats` | Catalog, download, account, play and health figures as JSON |
+
+### Settings, managed assets and audit
+
+The dashboard settings and governance screens use the following admin-only
+routes. They require the corresponding RBAC permission, a browser session and
+the CSRF token for mutations:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/admin/settings` | Read typed settings and runtime metadata |
+| `PATCH` | `/api/admin/settings` | Update writable settings with optimistic versions |
+| `POST` | `/api/admin/settings/smtp/test-connection` | Verify the configured SMTP connection |
+| `POST` | `/api/admin/settings/smtp/test-message` | Send a controlled SMTP test message |
+| `POST` | `/api/admin/settings/assets/logo` | Replace the Store logo asset |
+| `DELETE` | `/api/admin/settings/assets/logo` | Remove the managed Store logo |
+| `POST` | `/api/admin/settings/assets/favicon` | Replace the browser favicon asset |
+| `DELETE` | `/api/admin/settings/assets/favicon` | Remove the managed favicon |
+| `GET` | `/api/assets/logo` | Serve the active logo |
+| `GET` | `/api/assets/favicon` | Serve the active favicon |
+| `GET` | `/api/admin/audit` | List bounded administrative audit events |
+| `GET` | `/api/admin/audit/<event_id>` | Read one audit event and its change details |
+
+Settings asset uploads accept supported image formats and are optimized on the
+server. The public logo and favicon URLs are resolved by the Store runtime;
+clients should not hard-code generated asset filenames.
 
 ## Cartridge Catalog
 
@@ -154,7 +197,6 @@ cartridge is published as the user named in the ticket. `/api/me` and
 | `GET` | `/api/games/<id>` | Fetch one game record |
 | `GET` | `/api/games/<id>/icon` | Fetch icon bytes |
 | `GET` | `/api/games/<id>/screenshot` | Fetch screenshot bytes |
-| `GET` | `/api/games/<id>/preview` | Stream the version's `preview.mp4` (answers HTTP Range requests) |
 | `GET` | `/api/games/<id>/colophon` | Fetch colophon JSON |
 | `GET` | `/api/games/<id>/download` | Download `.prg32` artifact |
 | `POST` | `/api/publish` | Upload a zip bundle package for review |
@@ -164,11 +206,6 @@ cartridge is published as the user named in the ticket. `/api/me` and
 | `POST` | `/api/submissions/<id>/reject` | Reject a pending submission |
 
 Download requests accept `version` and `architecture` query parameters.
-
-`GET /api/games` also returns `featured`: the most recently published or
-updated cartridges, newest first, each with `featured_reason` (`new` or
-`updated`). Game records carry the optional fields `created_at`,
-`has_preview` and `preview` (`size`, `sha256`, `mime`, `updated_at`).
 
 `GET /api/games` accepts optional browsing parameters:
 
@@ -181,17 +218,6 @@ updated cartridges, newest first, each with `featured_reason` (`new` or
 The response keeps the legacy top-level `games` list and adds a `pagination`
 object with `page`, `per_page`, `total`, `pages`, `has_next`, `has_prev`,
 `next_page`, and `prev_page`.
-
-## Firmware Releases
-
-PRG32 firmware releases, fetched from GitHub and served from the Store for the
-Firmware page; see [Update the firmware over USB](firmware_flashing.md#api).
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/firmware/releases` | List firmware releases with a valid `prg32-firmware-release-1.0` manifest |
-| `GET` | `/api/firmware/releases/<tag>/prg32-firmware.json` | Fetch one release manifest |
-| `GET` | `/api/firmware/releases/<tag>/<file>.bin` | Fetch one flash part named in the manifest |
 
 ## Bundle Publish
 
@@ -212,7 +238,6 @@ Zip layout:
 manifest.json
 icon.png
 splash.png          optional
-preview.mp4         optional gameplay video shown on the cartridge page
 *.prg32             one or more
 ```
 
@@ -233,12 +258,6 @@ filename and a non-empty `architectures` list:
   ]
 }
 ```
-
-The preview video is found either at `preview.mp4` in the ZIP root or at the
-path named by `assets.preview`. It must be an MP4 file (an ISO `ftyp` box) and
-fits within the bundle size limit. Editors can watch it before verifying the
-submission; it is published with the version and removed with it. The upload
-answer reports `"preview": true` when one was found.
 
 Both `/api/publish/bundle` and the compatibility alias `/api/publish` accept
 only zip packages. The old per-field `.prg32` upload shape is rejected.
@@ -368,75 +387,19 @@ Response:
 
 ## Multiplayer
 
-The relay speaks `prg32-multiplayer-1.0`, the wire protocol specified by
-[PRG32-Multiplayer-Server](https://github.com/riscv-prg32/PRG32-Multiplayer-Server)
-(`docs/protocol.md`). A console can use either server without changes.
+The multiplayer relay is compatible with the standalone PRG32 MultiplayerServer.
 
 ```text
 ws://host:5080/api/multiplayer
 ```
 
-Each WebSocket text message is one JSON object of at most 1,024 bytes. Clients
-send:
+Clients send JSON messages:
 
 ```json
-{"type":"join","signature":"poing-wall:v1","flags":1,"player_id":2718281828,
- "protocol":"prg32-multiplayer-1.0","platform":"qemu","device_id":"<installation UUID>"}
-{"type":"state","x":148,"y":91,"sprite":3,"flags":1,"input":16,"frame":9402}
+{"type":"join","signature":"pong-v1","flags":1,"player_id":123}
+{"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
 {"type":"leave"}
-{"type":"ping"}
 ```
 
-The relay answers:
-
-```json
-{"type":"welcome","protocol":"prg32-multiplayer-1.0","player_id":2718281828,
- "connection_id":"<uuid>","device_id":"<22 base64url chars>","platform":"qemu",
- "persistent_device_id":true}
-{"type":"peer","player_id":2718281828,"device_id":"...","platform":"qemu",
- "x":148,"y":91,"sprite":3,"flags":1,"input":16,"frame":9402}
-{"type":"leave","player_id":2718281828}
-{"type":"pong","time":1793456789012}
-{"type":"error","code":"invalid_input","error":"invalid input"}
-```
-
-Rules, as in the reference server:
-
-- `signature`: 1–47 characters from letters, digits, `_`, `-`, `.`, `:`.
-  Rooms are isolated by exact signature.
-- `platform` is one of `esp32c6`, `qemu`, `prg32-qt`, `prg-ios`; any other
-  value becomes `unknown`. `device_id` (1–128 characters) is source material
-  only: the relay returns `base64url(HMAC-SHA-256(secret, platform NUL
-  device_id))[0:22]` and never stores, logs or relays the raw value. A join
-  without `device_id` (legacy firmware) gets a connection-only pseudonym and
-  `persistent_device_id: false`.
-- The `player_id` in `welcome` is authoritative. A requested ID is kept when it
-  is free in the room; otherwise the relay picks a random nonzero 32-bit ID.
-  The sender of a `state` is its connection: a `player_id` inside `state` is
-  ignored.
-- `state` fields are exact integers: `x`, `y` in −32768…32767, `sprite` and
-  `flags` in 0…65535, `input` in 0…127, `frame` in 0…4294967295. Invalid
-  fields are answered with `invalid_<field>` and the message is dropped.
-- `state` before `join` gets `join_required`; `leave` before `join` is a no-op.
-  Snapshots are relayed to the other room members only, never echoed and never
-  stored or replayed.
-- Error codes: `invalid_json`, `invalid_message`, `unknown_type`,
-  `message_too_large`, `invalid_signature`, `invalid_player_id`,
-  `invalid_flags`, `invalid_device_id`, `invalid_x`, `invalid_y`,
-  `invalid_sprite`, `invalid_input`, `invalid_frame`, `join_required`,
-  `room_full`, `rate_limited`, `binary_not_supported`. The `error` member
-  repeats the code in words for older Cartridge Store clients.
-- More than 40 messages per second closes the socket with code 1008 after a
-  `rate_limited` error. A connection silent for 15 seconds is closed.
-
-Store extension: when `PRG32_USERS` tokens are configured, `join` needs a token
-with the `player` role (in the `token` member, the `Authorization` header, or
-the `token` query parameter); otherwise the answer is the error code
-`unauthorized`.
-
-`GET /api/multiplayer` describes the protocol and limits;
-`GET /api/multiplayer/status` reports rooms, players and connections. Limits
-are set with `PRG32_MP_MAX_PEERS` (room size, default 8, the firmware peer
-table size), `PRG32_MP_MAX_MESSAGE_BYTES`, `PRG32_MP_MAX_RATE` and
-`PRG32_MP_IDLE_TIMEOUT`. `PRG32_MP_DEVICE_ID_SECRET` sets the pseudonym key;
-without it the key is derived from `SECRET_KEY`.
+Signatures may contain letters, digits, `_`, `-`, `.`, and `:`, up to 47
+characters.

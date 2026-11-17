@@ -1,0 +1,21 @@
+---
+title: Metadata and compatibility
+description: Stable public names used by Store discovery and cartridge metadata.
+---
+
+Metadata is part of the cartridge compatibility boundary. Consumers should preserve unknown fields and must not rename established ABI identifiers.
+
+| ABI name | Purpose |
+| --- | --- |
+| `prg32-metadata-1.0` | Cartridge bundle metadata |
+| `prg32-colophon-1.0` | Published cartridge colophon data |
+| `prg32-store-discovery-1.0` | Store discovery document |
+
+The discovery document is available at `/.well-known/prg32-store.json`:
+
+```http
+GET /.well-known/prg32-store.json
+Accept: application/json
+```
+
+The physical and emulator target identifiers are `esp32c6` and `qemu`. These names are shared with the firmware repository and should remain stable.

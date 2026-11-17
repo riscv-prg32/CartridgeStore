@@ -1,0 +1,34 @@
+---
+title: Cartridge format
+description: The public bundle shape used when a cartridge is submitted to the Store.
+---
+
+The Store accepts a ZIP bundle containing one manifest, an icon, an optional splash image, and one or more `.prg32` binaries. The server validates the archive before staging it for review.
+
+```text
+manifest.json
+icon.png
+splash.png       optional
+my-game-qemu.prg32
+my-game-esp32c6.prg32
+```
+
+Each architecture entry names the binary that belongs to that target. The Store keeps the identifier and version from the manifest stable through review and publication.
+
+## Manifest example
+
+```json
+{
+  "abi": "prg32-metadata-1.0",
+  "id": "org.example.game",
+  "title": "My Game",
+  "version": "1.0.0",
+  "assets": { "icon": "icon.png" },
+  "architectures": [
+    { "id": "qemu", "file": "game-qemu.prg32" },
+    { "id": "esp32c6", "file": "game-esp32c6.prg32" }
+  ]
+}
+```
+
+See [metadata and compatibility](/docs/store/metadata) for the stable ABI identifiers.

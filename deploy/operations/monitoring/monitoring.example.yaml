@@ -1,0 +1,43 @@
+# Portable Gatus-style example. Replace example origins at deployment time.
+# No credentials, recipients or Dream-infrastructure values belong in this file.
+endpoints:
+  - name: fastify-health
+    group: prg32
+    url: http://fastify:5080/health
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].ok == true"
+  - name: fastify-readiness
+    group: prg32
+    url: http://fastify:5080/ready
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].ok == true"
+  - name: next-health
+    group: prg32
+    url: http://next:3000/health
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].ok == true"
+  - name: public-store
+    group: public
+    url: https://store.example.test/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+  - name: public-api
+    group: public
+    url: https://api.example.test/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 720h"
+
+# Backup age, checksum verification, destination transfer evidence, disk
+# capacity, restart loops and single-writer state are host/job checks. They
+# need a trusted host monitor or CI scheduler; this example intentionally does
+# not contain alert recipients or a production scheduler.

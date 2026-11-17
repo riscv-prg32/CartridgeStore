@@ -2,52 +2,36 @@
 
 Guidance for coding agents working in this repository.
 
-## Scope
+## Project context
 
-This file applies to the whole repository. Follow it unless a more specific
-`AGENTS.md` exists deeper in the tree.
+PRG32 Cartridge Store is the classroom service for PRG32 cartridges. The
+repository contains one Fastify/TypeScript API and one Next.js frontend behind
+an operator-controlled edge and a separate Fumadocs documentation service.
+Local dnsmasq hostnames, TLS and mail services are operator-provided
+development details, not application defaults. These names are not production
+domains; production must provide its own registered DNS names, TLS
+certificates, public origins, cookie domain, and WebSocket URL through the
+operational Compose variables.
 
-## Project Context
+Keep the educational character of the project: prefer readable, explicit code,
+keep API contracts easy to explain in class, and keep setup instructions
+reproducible.
 
-PRG32 Cartridge Store is the classroom service for PRG32 cartridges. It hosts:
-
-- a Flask/PWA catalog for `.prg32` cartridge artifacts;
-- the ScoreServer-compatible `/api/scores` leaderboard API;
-- the MetricsServer-compatible `/api/runs` and `/api/metrics/batch` receiver;
-- the MultiplayerServer-compatible WebSocket relay at `/api/multiplayer`.
-
-The service name is intentionally **Cartridge Store**. The file format remains
-PRG32 "cartridge" terminology.
-
-Preserve the educational character of the project: prefer readable, explicit
-Python over clever abstractions, keep API contracts easy to explain in class,
-and keep setup instructions reproducible.
-
-## Repository Layout
+## Repository layout
 
 ```text
 .
-|-- app.py                    Development server entrypoint, exports app:app
-|-- cartridge_store/          Flask app, storage, cartridge format, services
-|-- templates/                Jinja templates for the PWA
-|-- static/                   PWA assets
-|-- tests/                    pytest coverage
-|-- docs/                     Setup, deployment, and API documentation
-|-- Dockerfile                Container image for quick deployment
-`-- docker-compose.yml        Local persistent deployment
+|-- backend/                 Fastify API, storage and service modules
+|-- frontend/                Next.js application and browser tests
+|-- docs/                    Setup, deployment, API and Fumadocs-ready Markdown
+|-- docs-site/               Standalone Next.js/Fumadocs documentation app
+|-- deploy/                  Deployment templates and backup tooling
+|-- cli/                     Firmware-facing integration client
+|-- docker-compose.yml       Local development topology
+`-- tests/                   Repository-level smoke tests
 ```
 
-## Naming Rules
-
-- Use `PRG32` for the platform name.
-- Use `Cartridge Store` for the server/product name.
-- Use `cartridge` for `.prg32` file terminology.
-- Keep public metadata ABI names stable:
-  - `prg32-metadata-1.0`
-  - `prg32-colophon-1.0`
-  - `prg32-store-discovery-1.0`
-
-## API Compatibility
+## API compatibility
 
 Do not break existing firmware/tool clients:
 
@@ -55,12 +39,10 @@ Do not break existing firmware/tool clients:
 - `GET /api/games/<id>`
 - `GET /api/games/<id>/icon`
 - `GET /api/games/<id>/screenshot`
-- `GET /api/games/<id>/preview`
 - `GET /api/games/<id>/colophon`
 - `GET /api/games/<id>/download`
 - `POST /api/publish`
-- `GET /api/scores`
-- `POST /api/scores`
+- `GET/POST /api/scores`
 - `POST /api/runs`
 - `POST /api/metrics/batch`
 - `POST /api/runs/<run_id>/finish`
@@ -71,72 +53,38 @@ Do not break existing firmware/tool clients:
 - `GET /api/multiplayer/status`
 - `WS /api/multiplayer`
 - `GET /.well-known/prg32-store.json`
-- `GET /api/firmware/releases`, `GET /api/firmware/releases/<tag>/<file>`
-
-The multiplayer relay must stay wire-compatible with `prg32-multiplayer-1.0`
-as specified in PRG32-Multiplayer-Server `docs/protocol.md`; see
-`tests/test_multiplayer_protocol.py`.
 
 When changing response shapes, preserve old fields and add new optional fields
 instead of replacing existing ones.
 
-## USB Installation
-
-- `static/js/prg32_usb_protocol.js` must stay byte-identical to
-  `static/js/prg32_usb_protocol.js` in PRG32-Construction-Kit; the contract is
-  PRG32 `docs/software/web_usb_deployment.md`.
-- Check a cartridge (catalog SHA-256, size, console ABI and limits) before
-  sending anything to a console, and never change the serial DTR/RTS lines.
-- Keep the service worker from caching `/api/` answers.
-- See [docs/usb_install.md](docs/usb_install.md).
-
-## Firmware Flashing
-
-- `/firmware` follows PRG32 `docs/usage/firmware_releases.md`
-  (`prg32-firmware-release-1.0`): verify every part's SHA-256, write each part
-  at its own offset, never erase NVS, cartridges or scores without the
-  explicit full-erase choice, and show a profile's `warning`.
-- Serve only files named in a validated manifest; never let the browser fetch
-  GitHub directly.
-- `static/vendor/esptool-js/` holds an unmodified `esptool-js` bundle; update it
-  only by replacing the file with a released `bundle.js`. Page code never sets
-  DTR or RTS: `esptool-js` does the resets.
-- See [docs/firmware_flashing.md](docs/firmware_flashing.md).
-
-## Single Sign-On
-
-- `cartridge_store/sso_protocol.py` must stay identical to
-  `prg32_construction_kit/sso_protocol.py` in PRG32-Construction-Kit.
-- Every code path that creates, changes or deletes a user must call
-  `sso.user_changed()` or `sso.user_deleted()` so a linked kit stays in sync.
-
-## Storage Rules
+## Storage rules
 
 - `PRG32_STORE_DATA` controls filesystem cartridge storage and the default
   SQLite database location.
 - `PRG32_STORE_DB` controls the unified SQLite database path.
-- Preserve support for legacy `PRG32_SCORE_DB` and `PRG32_METRICS_DB` as
-  compatibility fallbacks.
+- Preserve support for `PRG32_SCORE_DB` and `PRG32_METRICS_DB` as compatibility
+  fallbacks.
 - Do not store uploaded cartridge data in SQLite; keep cartridge files in the
   filesystem store.
-- Keep SQLite schema migrations idempotent through `CREATE TABLE IF NOT EXISTS`
-  and `CREATE INDEX IF NOT EXISTS` unless a deliberate migration plan is added.
+- Keep SQLite schema migrations idempotent with `CREATE TABLE IF NOT EXISTS`
+  and `CREATE INDEX IF NOT EXISTS` unless a deliberate migration plan exists.
 
-## Docker Rules
+## Docker rules
 
-- Keep the container listening on port `5080`.
-- Keep persistent data mounted at `/data`.
-- Keep the WebSocket relay on the same HTTP port as the web/API service.
-- The Docker image should run without requiring host-specific paths.
+- Keep the API listening on port `5080` in deployment images.
+- Keep persistent data mounted at `/data` in deployment templates.
+- Keep the WebSocket relay on the same HTTP port as the API.
+- Images must run without host-specific paths.
+- Local development uses `backend`, `next`, `docs` and one selected edge:
+  repository-owned Traefik by default, or the optional Nginx/Dream integration.
+- The generic local stack keeps email in memory. The optional Dream integration
+  may attach only the backend to an external mail network; do not add a second
+  Mailpit service to this Compose project.
 
-## PRG32 Firmware Consistency
+## Firmware consistency
 
-This server is paired with the PRG32 firmware and tool repository.
-Keep both repositories consistent.
-
-Companion repository: https://github.com/riscv-prg32/PRG32
-
-### Canonical constants -- must match in both repos
+The companion repository is https://github.com/riscv-prg32/PRG32. Keep these
+constants aligned in both repositories:
 
 | Constant | Value |
 |---|---|
@@ -145,49 +93,34 @@ Companion repository: https://github.com/riscv-prg32/PRG32
 | Discovery ABI | `prg32-store-discovery-1.0` |
 | Metadata ABI | `prg32-metadata-1.0` |
 | Colophon ABI | `prg32-colophon-1.0` |
-| Architecture -- physical | `esp32c6` |
-| Architecture -- QEMU | `qemu` |
+| Physical architecture | `esp32c6` |
+| QEMU architecture | `qemu` |
 
-### mDNS service registration
-
-CartridgeStore must register an mDNS service on startup using the
-already-installed `zeroconf` library:
-
-- Service type: `_prg32store._tcp`
-- Port: 5080, or `PRG32_STORE_PORT` if overridden
-- Instance name: configured `store_name` setting, default `PRG32 Cartridge Store`
-- TXT record: `abi=prg32-store-discovery-1.0`
-
-Deregister cleanly on shutdown. Guard registration and deregistration so mDNS
-failures degrade to logged warnings rather than startup crashes.
-
-If `PRG32_STORE_PORT` is set to a non-default value, update the port in the
-`/.well-known/prg32-store.json` response too.
-
-### Rules
-
-- Before changing any constant above in CartridgeStore, verify it matches in
-  the PRG32 firmware repo. Resolve discrepancies before merging.
-- Do not remove or rename fields from `/.well-known/prg32-store.json`; firmware
-  clients parse this response and will break silently on missing keys.
-- Architecture strings (`esp32c6`, `qemu`) are stored in SQLite; renaming them
-  requires a coordinated migration across both repos.
+Before changing a canonical constant, verify it in the companion repository.
+Do not remove or rename fields from `/.well-known/prg32-store.json`.
 
 ## Validation
 
-Before reporting completion, run the relevant subset:
+Use Node 24 and run the relevant checks before reporting completion:
 
 ```bash
-python3 -m py_compile app.py cartridge_store/*.py
+source "$HOME/.nvm/nvm.sh"
+nvm use 24
+pnpm --dir frontend run typecheck
+pnpm --dir frontend run lint
+pnpm --dir frontend run test
+pnpm --dir frontend run build
+pnpm --dir backend run typecheck
+pnpm --dir backend run lint
+pnpm --dir backend run test
+pnpm --dir backend run build
+pnpm --dir docs-site run typecheck
+pnpm --dir docs-site run build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml config
+docker compose config
 pytest -q
 git diff --check
 ```
 
-For Docker changes, also run when Docker is available:
-
-```bash
-docker compose config
-docker build -t prg32-cartridge-store:local .
-```
-
-If Docker or network access is unavailable, say so clearly.
+Do not reset, clean destructively, checkout existing files, modify operational
+data, or push commits unless the user explicitly requests it.

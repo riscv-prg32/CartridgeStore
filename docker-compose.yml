@@ -1,15 +1,143 @@
+name: prg32-cartridge-store
+
 services:
-  cartridge-store:
-    build: .
-    image: riscv-prg32/cartridge-store:local
-    container_name: prg32-cartridge-store
-    ports:
-      - "5080:5080"
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    image: riscv-prg32/cartridge-store-backend:dev-hot
+    command: ["sh", "-c", "pnpm install --frozen-lockfile && exec pnpm dev"]
     environment:
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
-      PRG32_STORE_DATA: /data
-      PRG32_STORE_DB: /data/cartridge_store.sqlite
-      PRG32_MP_MAX_PEERS: "8"
+      NODE_ENV: development
+      PRG32_BACKEND_HOST: 0.0.0.0
+      PRG32_BACKEND_PORT: "5090"
+      PRG32_BACKEND_DB: /canonical/store.sqlite
+      PRG32_BACKEND_STORE_DATA: /canonical
+      PRG32_BACKEND_CATALOG_READ_MODE: canonical-disposable
+      PRG32_BACKEND_CANONICAL_STORAGE_ROOT: /canonical
+      PRG32_BACKEND_CANONICAL_READ_AUTHORIZATION: M5.2G1-DISPOSABLE-CANONICAL-READ
+      PRG32_BACKEND_CANONICAL_WORKFLOW_MODE: disposable
+      PRG32_BACKEND_CANONICAL_WRITE_AUTHORIZATION: M5.2G2-DISPOSABLE-CANONICAL-WRITE
+      PRG32_BACKEND_AUTH_WRITE_ENABLED: "true"
+      PRG32_BACKEND_AUTH_WRITE_MODE: test
+      PRG32_BACKEND_AUTH_WRITE_DB: /canonical/store.sqlite
+      PRG32_BACKEND_AUTH_DISPOSABLE_ROOT: /canonical
+      PRG32_BACKEND_SESSION_SECRET: ${PRG32_BACKEND_SESSION_SECRET:-local-disposable-session-secret-change-me-123456}
+      PRG32_BACKEND_BOOTSTRAP_TOKEN: ${PRG32_BACKEND_BOOTSTRAP_TOKEN:-local-disposable-bootstrap-token-change-me-123456}
+      PRG32_BACKEND_SESSION_SECURE: "true"
+      PRG32_BACKEND_SESSION_SAMESITE: none
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_STORE_ORIGIN:-https://store.prg32.test}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_CORS_ORIGINS: ${PRG32_STORE_ORIGIN:-https://store.prg32.test}
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_SESSION_COOKIE_DOMAIN:-.prg32.test}
+      PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST: ${PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST:-mailpit}
+      PRG32_BACKEND_BACKUP_ENABLED: "false"
+      # The deployment permits mDNS in local development; the persisted
+      # browser setting controls whether the service is actually advertised.
+      PRG32_BACKEND_MDNS_ENABLED: ${PRG32_BACKEND_MDNS_ENABLED:-true}
+      PRG32_BACKEND_MDNS_INTERFACE: ${PRG32_BACKEND_MDNS_INTERFACE:-eth0}
+      PRG32_BACKEND_MDNS_HOST: ${PRG32_BACKEND_MDNS_HOST:-prg32-store.local}
+      PRG32_BACKEND_MDNS_PORT: "5090"
+      PRG32_BACKEND_LOG_LEVEL: ${PRG32_BACKEND_LOG_LEVEL:-info}
     volumes:
-      - ./data:/data
+      - ./backend:/app
+      - ${PRG32_BACKEND_NODE_MODULES_DIR:-./.local/backend/node_modules}:/app/node_modules
+      - ${PRG32_CANONICAL_DATA_DIR:-./.local/candidate/canonical}:/canonical
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:5090/ready').then(response => {
+          if (!response.ok) process.exit(1); })
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  next:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: riscv-prg32/cartridge-store-frontend:dev
+    command: ["sh", "-c", "pnpm install --frozen-lockfile && exec pnpm exec next dev --webpack --hostname 0.0.0.0"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "1000"
+      NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_ORIGIN:-https://api.prg32.test}
+      NEXT_PUBLIC_PRG32_STORE_ORIGIN: ${PRG32_STORE_ORIGIN:-https://store.prg32.test}
+    volumes:
+      - ./frontend:/app
+      - ${PRG32_FRONTEND_NODE_MODULES_DIR:-./.local/frontend/node_modules}:/app/node_modules
+      - ${PRG32_FRONTEND_NEXT_CACHE_DIR:-./.local/frontend/next-cache}:/app/.next
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  docs:
+    build:
+      context: .
+      dockerfile: docs-site/Dockerfile.dev
+    image: riscv-prg32/cartridge-store-docs:dev
+    command: ["sh", "-c", "pnpm install --frozen-lockfile && exec pnpm exec next dev --hostname 0.0.0.0"]
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "1000"
+      NEXT_PUBLIC_PRG32_STORE_ORIGIN: ${PRG32_STORE_ORIGIN:-https://store.prg32.test}
+    volumes:
+      - ./docs-site:/app
+      - ./frontend/content/docs:/app/content/docs
+      - ${PRG32_DOCS_NODE_MODULES_DIR:-./.local/docs/node_modules}:/app/node_modules
+      - ${PRG32_DOCS_SOURCE_DIR:-./.local/docs/source}:/app/.source
+      - ${PRG32_DOCS_NEXT_CACHE_DIR:-./.local/docs/next-cache}:/app/.next
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/docs/health').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  nginx:
+    image: nginx:1.27-alpine
+    environment:
+      PRG32_STORE_DOMAIN: ${PRG32_STORE_DOMAIN:-store.prg32.test}
+      PRG32_API_DOMAIN: ${PRG32_API_DOMAIN:-api.prg32.test}
+      NGINX_ENVSUBST_FILTER: "^(PRG32_STORE_DOMAIN|PRG32_API_DOMAIN)$"
+    depends_on:
+      backend:
+        condition: service_healthy
+      next:
+        condition: service_healthy
+      docs:
+        condition: service_healthy
+    ports:
+      - "${PRG32_HTTP_BIND:-0.0.0.0}:${PRG32_HTTP_PORT:-80}:80"
+      - "${PRG32_HTTPS_BIND:-0.0.0.0}:${PRG32_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./deploy/local/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${PRG32_TLS_DIR:-./.local/tls}:/etc/nginx/tls:ro
+    networks:
+      - app
     restart: unless-stopped
+
+networks:
+  app:
+    name: prg32_store_dev

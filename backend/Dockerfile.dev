@@ -1,0 +1,27 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+# Keep native development dependencies available for packages such as
+# better-sqlite3. The production image remains defined by Dockerfile and is
+# still multi-stage/slim.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install --global pnpm@12.5.1
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY tsconfig.json eslint.config.mjs ./
+COPY src ./src
+
+# Compose mounts the working tree over /app and keeps node_modules in a named
+# volume. Seed that volume with the correct ownership for the dev service.
+RUN chown -R node:node /app
+
+USER node
+
+EXPOSE 5090
+
+CMD ["pnpm", "dev"]

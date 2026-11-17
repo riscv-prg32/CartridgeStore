@@ -1,0 +1,17 @@
+# Optional Model A overlay for a reverse proxy managed outside this Compose
+# project. The operator must create the named external network first.
+services:
+  fastify:
+    networks:
+      - app_private
+      - proxy
+
+  next:
+    networks:
+      - app_private
+      - proxy
+
+networks:
+  proxy:
+    name: ${PRG32_PROXY_NETWORK:?create and name the external reverse-proxy network}
+    external: true

@@ -1,0 +1,965 @@
+{
+  "tables": [
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "user_id",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "token_hash",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "label",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "last_used",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "column": "user_id",
+          "foreignColumn": "id",
+          "foreignTable": "users",
+          "match": "NONE",
+          "onDelete": "CASCADE",
+          "onUpdate": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "name": "api_tokens_user_idx",
+          "orders": [
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "token_hash"
+          ],
+          "name": "sqlite_autoindex_api_tokens_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "api_tokens",
+      "sql": "CREATE TABLE api_tokens (\n    id          INTEGER PRIMARY KEY AUTOINCREMENT,\n    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    token_hash  TEXT    NOT NULL UNIQUE,\n    label       TEXT,\n    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),\n    last_used   TEXT\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "game_id",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "version",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "'pending'",
+          "name": "status",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "submitted_by_user_id",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "''",
+          "name": "submitted_by",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "reviewed_by_user_id",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "''",
+          "name": "reviewed_by",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "''",
+          "name": "pending_dir",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "metadata_json",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "architectures_json",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "reviewed_at",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "column": "reviewed_by_user_id",
+          "foreignColumn": "id",
+          "foreignTable": "users",
+          "match": "NONE",
+          "onDelete": "SET NULL",
+          "onUpdate": "NO ACTION"
+        },
+        {
+          "column": "submitted_by_user_id",
+          "foreignColumn": "id",
+          "foreignTable": "users",
+          "match": "NONE",
+          "onDelete": "SET NULL",
+          "onUpdate": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "name": "cartridge_submissions_status_idx",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        }
+      ],
+      "name": "cartridge_submissions",
+      "sql": "CREATE TABLE cartridge_submissions (\n    id                   INTEGER PRIMARY KEY AUTOINCREMENT,\n    game_id              TEXT NOT NULL,\n    version              TEXT NOT NULL,\n    status               TEXT NOT NULL DEFAULT 'pending',\n    submitted_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,\n    submitted_by         TEXT NOT NULL DEFAULT '',\n    reviewed_by_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,\n    reviewed_by          TEXT NOT NULL DEFAULT '',\n    pending_dir          TEXT NOT NULL DEFAULT '',\n    metadata_json        TEXT NOT NULL,\n    architectures_json   TEXT NOT NULL,\n    created_at           TEXT NOT NULL DEFAULT (datetime('now')),\n    reviewed_at          TEXT\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "game_id",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "version",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "architecture",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "user_id",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "ip_hash",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "user_agent",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "downloaded_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "architecture"
+          ],
+          "name": "download_events_arch_idx",
+          "orders": [
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "game_id",
+            "downloaded_at"
+          ],
+          "name": "download_events_game_idx",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        }
+      ],
+      "name": "download_events",
+      "sql": "CREATE TABLE download_events (\n    id            INTEGER PRIMARY KEY AUTOINCREMENT,\n    game_id       TEXT NOT NULL,\n    version       TEXT NOT NULL,\n    architecture  TEXT NOT NULL,\n    user_id       INTEGER,\n    ip_hash       TEXT,\n    user_agent    TEXT,\n    downloaded_at TEXT NOT NULL DEFAULT (datetime('now'))\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "name",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "name"
+          ],
+          "name": "sqlite_autoindex_groups_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "groups",
+      "sql": "CREATE TABLE groups (\n    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n    name       TEXT NOT NULL UNIQUE,\n    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "email",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "token_hash",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "expires_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "used_at",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "email",
+            "used_at",
+            "expires_at"
+          ],
+          "name": "registration_tokens_email_idx",
+          "orders": [
+            "ASC",
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "token_hash"
+          ],
+          "name": "sqlite_autoindex_registration_tokens_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "registration_tokens",
+      "sql": "CREATE TABLE registration_tokens (\n    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n    email      TEXT NOT NULL,\n    token_hash TEXT NOT NULL UNIQUE,\n    created_at TEXT NOT NULL DEFAULT (datetime('now')),\n    expires_at TEXT NOT NULL,\n    used_at    TEXT\n)"
+    },
+    {
+      "autoIncrement": false,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "run_id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "board_id",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "target",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "''",
+          "name": "display_backend",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "''",
+          "name": "firmware_version",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "''",
+          "name": "firmware_git_sha",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "''",
+          "name": "game_name",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "1",
+          "name": "sample_period_frames",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "started_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "finished_at",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "0",
+          "name": "dropped_samples",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "strftime('%s', 'now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "''",
+          "name": "submitted_by",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "user_id",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "column": "user_id",
+          "foreignColumn": "id",
+          "foreignTable": "users",
+          "match": "NONE",
+          "onDelete": "NO ACTION",
+          "onUpdate": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "run_id"
+          ],
+          "name": "sqlite_autoindex_runs_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "runs",
+      "sql": "CREATE TABLE runs (\n    run_id TEXT PRIMARY KEY,\n    board_id TEXT NOT NULL,\n    target TEXT NOT NULL,\n    display_backend TEXT NOT NULL DEFAULT '',\n    firmware_version TEXT NOT NULL DEFAULT '',\n    firmware_git_sha TEXT NOT NULL DEFAULT '',\n    game_name TEXT NOT NULL DEFAULT '',\n    sample_period_frames INTEGER NOT NULL DEFAULT 1,\n    started_at INTEGER NOT NULL,\n    finished_at INTEGER,\n    dropped_samples INTEGER NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),\n    submitted_by TEXT NOT NULL DEFAULT ''\n, user_id INTEGER REFERENCES users(id))"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "run_id",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "frame",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "timestamp_ms",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "update_us",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "draw_us",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "present_us",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "frame_us",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "heap_free",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "heap_min_free",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "input_mask",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "fps_x100",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "upload_queue_depth",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "0",
+          "name": "deadline_missed",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "strftime('%s', 'now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "column": "run_id",
+          "foreignColumn": "run_id",
+          "foreignTable": "runs",
+          "match": "NONE",
+          "onDelete": "CASCADE",
+          "onUpdate": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "run_id",
+            "frame_us"
+          ],
+          "name": "samples_run_frame_time_idx",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "run_id",
+            "frame"
+          ],
+          "name": "samples_run_frame_idx",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "run_id",
+            "frame"
+          ],
+          "name": "sqlite_autoindex_samples_1",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "samples",
+      "sql": "CREATE TABLE samples (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,\n    frame INTEGER NOT NULL,\n    timestamp_ms INTEGER NOT NULL,\n    update_us INTEGER NOT NULL,\n    draw_us INTEGER NOT NULL,\n    present_us INTEGER NOT NULL,\n    frame_us INTEGER NOT NULL,\n    heap_free INTEGER NOT NULL,\n    heap_min_free INTEGER NOT NULL,\n    input_mask INTEGER NOT NULL,\n    fps_x100 INTEGER NOT NULL,\n    upload_queue_depth INTEGER NOT NULL,\n    deadline_missed INTEGER NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),\n    UNIQUE(run_id, frame)\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "game",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "player",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "score",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": "''",
+          "name": "submitted_by",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "game",
+            "score",
+            "created_at"
+          ],
+          "name": "scores_game_score_idx",
+          "orders": [
+            "ASC",
+            "DESC",
+            "ASC"
+          ],
+          "unique": false
+        }
+      ],
+      "name": "scores",
+      "sql": "CREATE TABLE scores (\n            id INTEGER PRIMARY KEY AUTOINCREMENT,\n            game TEXT NOT NULL,\n            player TEXT NOT NULL,\n            score INTEGER NOT NULL,\n            created_at INTEGER NOT NULL,\n            submitted_by TEXT NOT NULL DEFAULT ''\n        )"
+    },
+    {
+      "autoIncrement": false,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "key",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "value",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "key"
+          ],
+          "name": "sqlite_autoindex_store_settings_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "store_settings",
+      "sql": "CREATE TABLE store_settings (\n    key   TEXT PRIMARY KEY,\n    value TEXT NOT NULL\n)"
+    },
+    {
+      "autoIncrement": false,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "user_id",
+          "notNull": true,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "group_id",
+          "notNull": true,
+          "primaryKeyPosition": 2,
+          "type": "INTEGER"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "column": "group_id",
+          "foreignColumn": "id",
+          "foreignTable": "groups",
+          "match": "NONE",
+          "onDelete": "CASCADE",
+          "onUpdate": "NO ACTION"
+        },
+        {
+          "column": "user_id",
+          "foreignColumn": "id",
+          "foreignTable": "users",
+          "match": "NONE",
+          "onDelete": "CASCADE",
+          "onUpdate": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "user_id",
+            "group_id"
+          ],
+          "name": "sqlite_autoindex_user_groups_1",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "user_groups",
+      "sql": "CREATE TABLE user_groups (\n    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,\n    PRIMARY KEY(user_id, group_id)\n)"
+    },
+    {
+      "autoIncrement": true,
+      "columns": [
+        {
+          "defaultValue": null,
+          "name": "id",
+          "notNull": false,
+          "primaryKeyPosition": 1,
+          "type": "INTEGER"
+        },
+        {
+          "defaultValue": null,
+          "name": "username",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "email",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "password_hash",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "'user'",
+          "name": "role",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "external_id",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "external_provider",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": "datetime('now')",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        },
+        {
+          "defaultValue": null,
+          "name": "last_login",
+          "notNull": false,
+          "primaryKeyPosition": 0,
+          "type": "TEXT"
+        }
+      ],
+      "foreignKeys": [],
+      "indexes": [
+        {
+          "columns": [
+            "external_provider",
+            "external_id"
+          ],
+          "name": "users_external_idx",
+          "orders": [
+            "ASC",
+            "ASC"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "email"
+          ],
+          "name": "sqlite_autoindex_users_2",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        },
+        {
+          "columns": [
+            "username"
+          ],
+          "name": "sqlite_autoindex_users_1",
+          "orders": [
+            "ASC"
+          ],
+          "unique": true
+        }
+      ],
+      "name": "users",
+      "sql": "CREATE TABLE users (\n    id                INTEGER PRIMARY KEY AUTOINCREMENT,\n    username          TEXT    NOT NULL UNIQUE,\n    email             TEXT    NOT NULL UNIQUE,\n    password_hash     TEXT,\n    role              TEXT    NOT NULL DEFAULT 'user',\n    external_id       TEXT,\n    external_provider TEXT,\n    created_at        TEXT    NOT NULL DEFAULT (datetime('now')),\n    last_login        TEXT\n)"
+    }
+  ]
+}

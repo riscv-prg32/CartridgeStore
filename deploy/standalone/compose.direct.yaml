@@ -1,0 +1,11 @@
+# Explicit local-only access overlay. This is not a public-production edge.
+# The ports bind to loopback and the application still requires secure origins
+# and secure cookies; use a local TLS terminator for complete auth/setup flows.
+services:
+  fastify:
+    ports:
+      - "127.0.0.1:${PRG32_FASTIFY_HOST_PORT:-15080}:5080"
+
+  next:
+    ports:
+      - "127.0.0.1:${PRG32_NEXT_HOST_PORT:-13000}:3000"

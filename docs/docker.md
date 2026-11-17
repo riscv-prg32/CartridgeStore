@@ -1,121 +1,71 @@
-# Docker Deployment
+# Docker
 
-Docker deployment runs the web catalog, score API, metrics receiver, and
-multiplayer WebSocket relay as one service.
+## Development
 
-## Quick Start
+For a local setup that does not depend on Dream Platform, use dnsmasq plus
+mkcert and the repository-owned Traefik overlay. The complete procedure,
+including the DNS entry and certificate generation, is in
+[Development](development.md#local-development-with-dnsmasq-mkcert-and-traefik).
 
-```bash
-export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-docker compose up --build
-```
-
-Open:
-
-```text
-http://127.0.0.1:5080/
-```
-
-The WebSocket multiplayer URL is:
-
-```text
-ws://127.0.0.1:5080/api/multiplayer
-```
-
-## Persistent Data
-
-`docker-compose.yml` mounts `./data` on the host to `/data` in the container.
-The container uses:
-
-```text
-PRG32_STORE_DATA=/data
-PRG32_STORE_DB=/data/cartridge_store.sqlite
-```
-
-This keeps uploaded cartridges, pending review packages, the catalog index,
-scores, and metrics outside the container image.
-
-## Build Only
+The root Compose file and the generic edge overlay form the self-contained
+local TLS stack:
 
 ```bash
-docker build -t prg32-cartridge-store:local .
+cp .env.example .env
+./deploy/local/setup-tls.sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml ps
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml logs -f backend next docs traefik
 ```
 
-Run the image manually:
+It starts `backend`, `next`, `docs` and a generic Traefik edge on the private
+application and edge networks. Traefik publishes ports 80 and 443, redirects
+HTTP to HTTPS, routes the Store/API subhosts and preserves WebSocket upgrades.
+The application services are not exposed directly on host ports.
+
+## Dream Platform edge (optional)
+
+When the shared Dream Platform Traefik service should own HTTPS ingress, use
+the dedicated override instead of starting the local Nginx service:
 
 ```bash
-docker run --rm \
-  -p 5080:5080 \
-  -v "$PWD/data:/data" \
-  -e SECRET_KEY="$SECRET_KEY" \
-  -e PRG32_STORE_DATA=/data \
-  -e PRG32_STORE_DB=/data/cartridge_store.sqlite \
-  prg32-cartridge-store:local
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.dream-platform.yml \
+  up -d --build backend next docs
 ```
 
-Database users are the primary auth path. The image seeds `admin` / `password`
-as an administrator and editor; change that password before real use. New users
-register by email verification link. Configure `PRG32_SMTP_HOST` and related
-SMTP variables to send those links. Legacy `PRG32_USERS` tokens are still
-accepted for API clients, but database users in the `editors` group must verify
-pending cartridge packages.
+The override attaches the routed services to the external `DREAM_EDGE_NETWORK`
+and attaches only the backend to `DREAM_MAIL_NETWORK`. Those networks and the
+shared Traefik service must already exist. Set the exact Store/API origins and
+cookie domain in the repository `.env` or an operator-provided environment
+file. The shared Traefik edge, standalone Nginx and repository-owned generic
+Traefik are mutually exclusive owners of host ports 80 and 443.
 
-Use `/setup` to configure SMTP, mDNS, OpenID Connect, and SAML2 from the
-browser. Environment variables with matching `PRG32_*` names override saved
-setup values after restart.
+## Deployment images
 
-## Classroom LAN Deployment
-
-Find the host computer IP address and point boards to:
-
-```text
-http://<host-ip>:5080
-ws://<host-ip>:5080/api/multiplayer
-```
-
-The discovery document is available at:
-
-```text
-http://<host-ip>:5080/.well-known/prg32-store.json
-```
-
-The service advertises itself via mDNS as `_prg32store._tcp.local.`. Set
-`PRG32_MDNS_DISABLED=1` to turn that off, or `PRG32_MDNS_NAME` to change the
-advertised name.
-
-## Backup and Restore
-
-Administrators can download and restore a full ZIP backup from `/admin/backup`.
-The archive includes the SQLite database and filesystem data mounted under
-`/data`, covering settings, users, roles, groups, cartridges, scores,
-statistics, measurements, and metrics.
-
-## Maintenance
-
-View logs:
+Build the two production images independently:
 
 ```bash
-docker compose logs -f
+docker build -f backend/Dockerfile.operational \
+  -t prg32-cartridge-store-backend:local backend
+docker build -f frontend/Dockerfile.operational \
+  -t prg32-cartridge-store-frontend:local frontend
 ```
 
-Restart after configuration changes:
+The frontend receives its public API origin at build time through
+`NEXT_PUBLIC_PRG32_API_ORIGIN`. It does not contain a runtime proxy.
+
+## Cleanup
+
+Only remove project resources after verifying the exact targets:
 
 ```bash
-docker compose restart
+docker compose down --remove-orphans
+docker image prune -f
+docker builder prune -f
+docker volume prune -f
 ```
 
-Stop the service while keeping data:
-
-```bash
-docker compose down
-```
-
-Stop and remove local persistent data:
-
-```bash
-docker compose down
-rm -rf data
-```
-
-Only remove `data` when you intentionally want to delete uploaded cartridges,
-scores, and metrics.
+Never use broad destructive Docker cleanup on a host that contains unrelated
+projects.

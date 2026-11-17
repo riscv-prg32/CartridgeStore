@@ -1,0 +1,28 @@
+FROM node:24-bookworm-slim AS dependencies
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install --global pnpm@12.5.1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --no-optional
+
+FROM dependencies AS builder
+COPY tsconfig.json ./
+COPY src ./src
+RUN pnpm run build
+
+FROM dependencies AS production-dependencies
+RUN pnpm prune --prod --no-optional
+
+FROM node:24-bookworm-slim AS runtime
+ENV NODE_ENV=production PRG32_BACKEND_HOST=0.0.0.0 PRG32_BACKEND_PORT=5080
+WORKDIR /app
+COPY --from=builder /app/package.json ./package.json
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+RUN mkdir -p /data/canonical /tmp/prg32 \
+    && chown -R node:node /data /tmp/prg32 /app
+USER node
+EXPOSE 5080
+CMD ["node", "dist/server.js"]

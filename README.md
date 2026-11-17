@@ -1,307 +1,76 @@
 # PRG32 Cartridge Store
 
-An installable Flask/PWA catalog and classroom service hub for PRG32 `.prg32`
-game cartridges.
+PRG32 Cartridge Store is the classroom service for `.prg32` cartridges. The
+runtime is a Fastify/TypeScript API paired with a Next.js frontend.
 
-![Cartridge Store privacy architecture](docs/images/privacy-architecture.svg)
+## Development
 
-## Hard Requirements
+The local development stack can use any private DNS suffix. The documented
+default is `prg32.test`, resolved by dnsmasq and terminated by the repository's
+generic Traefik overlay:
 
-- Preserve the public cartridge, score, metrics, multiplayer, and discovery
-  contracts documented below.
-- Run production deployments behind HTTPS with a high-entropy `SECRET_KEY`,
-  `PRG32_SECURE_COOKIES=true`, durable protected storage, tested backups, and a
-  changed bootstrap administrator password.
-- Treat GDPR compliance as a continuous controller obligation. Before admitting
-  users, complete the Privacy and GDPR setup, select and document lawful bases
-  and retention periods, publish the privacy notice, inventory processors and
-  transfers, and establish rights-request and breach procedures.
-- Reassess privacy and security whenever data, purposes, providers, audiences,
-  or applicable law change. Software controls support compliance but cannot by
-  themselves certify a deployment.
+- <https://store.prg32.test> — Next.js storefront and dashboard;
+- <https://store.prg32.test/docs> — dedicated Fumadocs documentation service;
+- <https://api.prg32.test> — Fastify API and WebSocket relay.
 
-See [GDPR and privacy operations](docs/gdpr.md) for the mandatory deployment
-checklist, data map, retention schedule, rights workflow, incident procedure,
-and authoritative EU sources.
+Dream Platform is not required. Email is kept in memory in the disposable
+development profile; configure SMTP from the Store settings when a real mail
+service is needed.
 
-## Quick Deploy With Docker
+These are local-only development hosts. Production runs on another server and
+must configure its own registered storefront/API domains, HTTPS origins,
+cookie domain, certificates and WebSocket URL through the operational Compose
+template.
+
+Start the development topology with Node.js 24 and Docker Desktop:
 
 ```bash
-docker compose up --build
+source "$HOME/.nvm/nvm.sh"
+nvm use 24
+cp .env.example .env
+# Add the two hosts to dnsmasq; see docs/development.md.
+./deploy/local/setup-tls.sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 ```
 
-Open <http://127.0.0.1:5080/>.
+Persistent canonical development data is kept in `.local/candidate/canonical`;
+it is not modified by the application build. Local TLS files are generated in
+`.local/tls` and are not committed.
 
-The compose file mounts `./data` to `/data` in the container so uploaded
-cartridges, scores, metrics, and the catalog index persist across restarts.
+## Public contracts
 
-Stop the service:
+The Fastify service preserves the catalog, download, scores, metrics,
+multiplayer, discovery, authentication, federation, and publishing contracts.
+Firmware-facing constants remain unchanged, including `esp32c6`, `qemu`,
+`prg32-metadata-1.0`, `prg32-colophon-1.0`, and
+`prg32-store-discovery-1.0`.
+
+The public API is documented in [docs/api.md](docs/api.md). The current
+topology and operational boundaries are described in
+[docs/architecture.md](docs/architecture.md).
+The dedicated Fumadocs application and its content workflow are described in
+[docs-site/README.md](docs-site/README.md).
+The generic local DNS, TLS and Traefik contract is documented in
+[docs/development.md](docs/development.md). Dream Platform remains an optional
+integration documented in [docs/dream-platform.md](docs/dream-platform.md).
+
+## Validation
 
 ```bash
-docker compose down
-```
-
-See [docs/docker.md](docs/docker.md) for manual `docker run`, LAN deployment,
-logs, and maintenance notes.
-
-## Run With Python
-
-```bash
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
-Open <http://127.0.0.1:5080/>.
-
-Set `PRG32_STORE_DATA=/path/to/data` to move filesystem storage. By default the
-store writes cartridges to `data/cartridges`, the extracted index to
-`data/index.json`, and service data to `data/cartridge_store.sqlite`.
-
-Set `PRG32_STORE_DB=/path/to/cartridge_store.sqlite` to choose a different
-SQLite database. Legacy `PRG32_SCORE_DB` and `PRG32_METRICS_DB` environment
-variables are also honored when `PRG32_STORE_DB` is not set.
-
-For a detailed environment setup, see
-[docs/getting_started.md](docs/getting_started.md).
-
-## Users and Roles
-
-The service seeds a default administrator account:
-
-```text
-username: admin
-password: password
-```
-
-Change that password before real use. New users register by entering an email
-address, receiving a verification link, and setting a password from that link.
-Their username is the verified email address.
-
-Authenticated users can upload cartridge packages. Users in the `editors` group
-verify pending packages before they appear in the public catalog. Legacy
-`PRG32_USERS` tokens are still accepted for API and multiplayer clients.
-
-Administrators use `/setup` for store, publish, mDNS, SMTP, OpenID Connect,
-and SAML2 settings. `/admin/users`, `/admin/groups`, `/admin/roles`,
-`/admin/cartridges`, and `/admin/backup` cover user/group/role assignment,
-cartridge administration, and full backup/restore.
-
-## Versioning and Architectures
-
-A `.prg32` file contains one linked executable image. The store groups uploads
-by metadata `id` and `version`, and then stores one artifact per architecture:
-
-- `esp32c6`: physical ESP32-C6 PRG32 firmware.
-- `qemu`: ESP32-C3 QEMU RGB screen workflow.
-
-Download endpoints accept `version` and `architecture` query parameters:
-
-```http
-GET /api/games/org.example.game/download?version=1.0.0&architecture=esp32c6
-```
-
-## REST API
-
-| Method | Path |
-| --- | --- |
-| `GET` | `/api` |
-| `GET` | `/api/me` |
-| `GET` | `/api/me/export` |
-| `GET` | `/api/games` |
-| `GET` | `/api/games/<id>` |
-| `GET` | `/api/games/<id>/icon` |
-| `GET` | `/api/games/<id>/screenshot` |
-| `GET` | `/api/games/<id>/colophon` |
-| `GET` | `/api/games/<id>/download` |
-| `POST` | `/api/publish` |
-| `GET` | `/api/scores` |
-| `POST` | `/api/scores` |
-| `GET` | `/api/metrics` |
-| `GET` | `/api/runs` |
-| `POST` | `/api/runs` |
-| `POST` | `/api/metrics/batch` |
-| `POST` | `/api/runs/<run_id>/finish` |
-| `GET` | `/api/runs/<run_id>` |
-| `GET` | `/api/runs/<run_id>/samples.csv` |
-| `GET` | `/api/runs/<run_id>/report.md` |
-| `GET` | `/api/multiplayer` |
-| `GET` | `/api/multiplayer/status` |
-| `WS` | `/api/multiplayer` |
-| `GET` | `/.well-known/prg32-store.json` |
-
-`POST /api/publish` and `POST /api/publish/bundle` accept `multipart/form-data`
-with a single `bundle=@game.zip` package. Uploads enter the editor review queue.
-
-## Scores
-
-The score API is compatible with the standalone PRG32 ScoreServer:
-
-```bash
-curl http://localhost:5080/api/scores
-curl -X POST http://localhost:5080/api/scores \
-  -H 'Content-Type: application/json' \
-  -d '{"game":"pong","player":"Ada","score":42}'
-```
-
-Use `?game=<name>` to filter scores for one game and `?limit=<n>` to choose a
-result limit between 1 and 100. Add `?player=<name>` to show scores for one
-player. The browser scoreboard is available from the navigation bar at
-`/scores` and accepts the same `game`, `player`, and `limit` query filters.
-
-## Metrics
-
-The metrics API is compatible with the standalone PRG32 MetricsServer:
-
-```bash
-curl -X POST http://127.0.0.1:5080/api/runs \
-  -H 'Content-Type: application/json' \
-  -d '{"run_id":"demo","board_id":"board-1","target":"esp32c6"}'
-
-curl -X POST http://127.0.0.1:5080/api/metrics/batch \
-  -H 'Content-Type: application/json' \
-  -d '{"run_id":"demo","samples":[{"frame":1,"frame_us":23500}]}'
-```
-
-Useful URLs:
-
-- `http://127.0.0.1:5080/api/runs`
-- `http://127.0.0.1:5080/api/runs/demo`
-- `http://127.0.0.1:5080/api/runs/demo/samples.csv`
-- `http://127.0.0.1:5080/api/runs/demo/report.md`
-
-Export one metrics run:
-
-```bash
-python -m cartridge_store.export_run demo \
-  --db data/cartridge_store.sqlite \
-  --out metrics_export/demo
-```
-
-The export directory contains metadata JSON, sample CSV, summary CSV, a LaTeX
-summary table, a Markdown report, and plots when `matplotlib` is available.
-
-## Multiplayer
-
-The multiplayer relay speaks `prg32-multiplayer-1.0`, the protocol of the
-standalone [PRG32-Multiplayer-Server](https://github.com/riscv-prg32/PRG32-Multiplayer-Server),
-and runs on the same Cartridge Store service:
-
-```text
-ws://127.0.0.1:5080/api/multiplayer
-```
-
-Clients send:
-
-```json
-{"type":"join","signature":"pong-v1","flags":1,"player_id":123,"platform":"esp32c6","device_id":"<local id>"}
-{"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
-{"type":"leave"}
-{"type":"ping"}
-```
-
-The relay answers `welcome` (authoritative `player_id`, `connection_id`,
-pseudonymous `device_id`), `peer`, `leave`, `pong` and coded `error` messages.
-See [docs/api.md](docs/api.md#multiplayer) for the full contract.
-
-## Compatibility and Safety
-
-- The store never executes uploaded cartridge code.
-- Upload size is limited by Flask `MAX_CONTENT_LENGTH`.
-- Game IDs and versions are restricted to path-safe characters.
-- Metadata and colophon JSON are validated before publishing.
-- Icon and screenshot uploads must be PNG or JPEG bytes.
-- Unknown metadata trailer TLV blocks are preserved when rewriting a cartridge.
-- Score and metrics inputs are length-limited before storage.
-- Multiplayer rooms are isolated by path-safe cartridge signatures.
-- The game colophon is shown after the cartridge is activated, before the player
-  starts a new play.
-- Score, metrics, and multiplayer APIs keep the legacy request and response
-  contracts from the archived standalone servers.
-- The versioned `/privacy` notice, machine-readable personal-data export,
-  self-service account erasure, finite telemetry retention, and browser security
-  headers provide a privacy-by-design baseline.
-- The service uses no advertising or non-essential tracking cookies.
-- Email addresses are private account identifiers. Public profiles, scores,
-  metrics, reviews, and catalog publisher fields use a separate public handle.
-- State-changing browser forms use CSRF tokens; data export and account erasure
-  require a recently authenticated session, and local erasure also requires the
-  current password.
-
-## Tests
-
-```bash
+pnpm --dir frontend run typecheck
+pnpm --dir frontend run lint
+pnpm --dir frontend run test
+pnpm --dir frontend run build
+pnpm --dir backend run typecheck
+pnpm --dir backend run lint
+pnpm --dir backend run test
+pnpm --dir backend run build
+pnpm --dir docs-site run typecheck
+pnpm --dir docs-site run build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml config
 pytest -q
+git diff --check
 ```
 
-## Documentation
-
-Start here:
-
-- [Getting started](docs/getting_started.md): local Python setup, first-run
-  Store configuration, default administrator login, package upload and review,
-  score submission, metrics smoke tests, mDNS, SMTP, external auth, and theme
-  customization.
-- [Getting started with PRG32 game development](docs/getting_started_game_development.md):
-  host tool installation on Windows, Linux, and macOS; PlatformIO and ESP-IDF
-  setup; creating a hello world cartridge from scratch; running it in QEMU;
-  uploading it to ESP32-C6 hardware; packaging and publishing it to the Store.
-
-Operate and deploy the Store:
-
-- [Docker deployment](docs/docker.md): Docker Compose quick start, persistent
-  `/data` storage, manual `docker run`, classroom LAN URLs, mDNS behavior,
-  full backup/restore, logs, restarts, and data reset.
-- [Deployment](docs/deployment.md): production environment variables,
-  reverse-proxy notes, WebSocket proxying, SMTP, OIDC, SAML2, mDNS, backup
-  expectations, and production hardening checklist.
-- [Operations](docs/operations.md): daily classroom operations, backup and
-  restore, health checks, publishing workflow, user registration, admin pages,
-  access-token rotation, logs, network checks, and full data reset.
-- [GDPR and privacy operations](docs/gdpr.md): hard production requirements,
-  data-flow architecture, controller duties, retention, data-subject rights,
-  security, incident response, and review sources.
-
-Integrate with clients and tools:
-
-- [Accounts and single sign-on](docs/accounts_and_sso.md): sharing users
-  with a PRG32-Construction-Kit.
-- [Install over USB](docs/usb_install.md): putting a published cartridge on a
-  PRG32 connected to the visitor's computer, from the game page (Web Serial).
-- [Update the firmware over USB](docs/firmware_flashing.md): browsing PRG32
-  firmware releases and writing one onto a console from the Firmware page.
-- [Unified service API](docs/api.md): discovery document, auth endpoints,
-  admin endpoints, cartridge package format, editor verification API, scores,
-  metrics, statistics, multiplayer, and compatibility notes.
-
-What to read for common tasks:
-
-- Run the Store locally: [Getting started](docs/getting_started.md).
-- Deploy the Store with Docker: [Docker deployment](docs/docker.md).
-- Deploy the Store behind HTTPS: [Deployment](docs/deployment.md).
-- Administer users, groups, cartridges, setup, or backups:
-  [Operations](docs/operations.md).
-- Create a new PRG32 game cartridge:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
-- Install a cartridge on a PRG32 over USB: [Install over USB](docs/usb_install.md).
-- Update a PRG32's firmware from the browser: [Update the firmware over USB](docs/firmware_flashing.md).
-- Publish a cartridge package: [Getting started](docs/getting_started.md) for
-  the browser flow, or [Unified service API](docs/api.md) for the API flow.
-- Build firmware or prepare PlatformIO/ESP-IDF:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
-- Run a cartridge in QEMU:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
-- Upload a cartridge to physical hardware:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
-- Perform performance or metrics tests: [Getting started](docs/getting_started.md)
-  for a smoke test, [Unified service API](docs/api.md) for ingestion endpoints,
-  and [Operations](docs/operations.md) for service checks.
-- Contribute to game development:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md).
-- Contribute to firmware development:
-  [Getting started with PRG32 game development](docs/getting_started_game_development.md)
-  for PlatformIO/ESP-IDF setup, then use the firmware SDK's own contribution
-  guide for board-specific internals.
-- Integrate firmware, launchers, classroom dashboards, or CI tools:
-  [Unified service API](docs/api.md).
+The runtime cutover audit and remaining work are tracked in
+`docs/modernization/`.

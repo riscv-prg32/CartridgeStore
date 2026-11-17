@@ -1,0 +1,24 @@
+---
+title: Publishing workflow
+description: Submit a bundle, then wait for editor review before it becomes public.
+---
+
+Publishing is a review workflow. An authenticated developer uploads a ZIP bundle to `/api/publish/bundle`. A successful upload creates a pending submission; it does not immediately add the cartridge to the public catalog.
+
+```http
+POST /api/publish/bundle
+Content-Type: multipart/form-data
+
+Form field: bundle=@game.zip
+```
+
+## What happens next
+
+- The authenticated principal is recorded as the submission owner.
+- Editors inspect pending submissions and may adjust descriptive metadata fields.
+- Verification publishes the accepted artifact; rejection keeps it out of the public catalog.
+- The developer workspace shows only the authenticated user's ownership-scoped submissions.
+
+Browser session mutations require the session-bound CSRF token. Bearer/API-token clients use the documented token path and do not use browser CSRF state.
+
+Open the [Developer workspace](/workspace) to manage your submissions.

@@ -1,0 +1,14 @@
+# Generic CI example. Keep the token in the CI secret store; never put it in
+# this file or in command output. Adapt the runner syntax to the CI provider.
+steps:
+  - run: source "$HOME/.nvm/nvm.sh" && nvm use 24 && pnpm --dir cli install --frozen-lockfile
+  - run: pnpm --dir cli run check
+  - run: pnpm --dir cli dev -- --json --server "$PRG32_STORE_URL" --token-env CI_PRG32_STORE_TOKEN doctor
+    env:
+      CI_PRG32_STORE_TOKEN: ${{ secrets.PRG32_STORE_TOKEN }}
+  - run: pnpm --dir cli dev -- --json --server "$PRG32_STORE_URL" --token-env CI_PRG32_STORE_TOKEN cartridges validate ./release.zip
+    env:
+      CI_PRG32_STORE_TOKEN: ${{ secrets.PRG32_STORE_TOKEN }}
+  - run: pnpm --dir cli dev -- --json --server "$PRG32_STORE_URL" --token-env CI_PRG32_STORE_TOKEN cartridges upload ./release.zip
+    env:
+      CI_PRG32_STORE_TOKEN: ${{ secrets.PRG32_STORE_TOKEN }}

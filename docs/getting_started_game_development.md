@@ -67,11 +67,6 @@ cartridge files and an icon in the same directory:
 ```
 
 For a real publication, use your own game ID, authors, version, and artwork.
-
-To show a gameplay video on the cartridge page, add a short `preview.mp4`
-(H.264, no sound needed, a few MB) beside the manifest, or name it with
-`"assets": {"icon": "icon.png", "preview": "preview.mp4"}`. Editors watch it
-during review; the page never plays it automatically.
 Place `icon.png` beside the manifest, then package and submit:
 
 ```bash
@@ -79,8 +74,13 @@ python3 -m prg32 store pack-bundle \
   --manifest build/store-blackjack/manifest.json \
   --out build/store-blackjack.zip
 python3 -m prg32 store publish-bundle build/store-blackjack.zip \
-  --store-url http://127.0.0.1:5080 --token YOUR_TOKEN
+  --store-url https://api.prg32.test --token YOUR_TOKEN
 ```
+
+The generic local edge publishes the API at `api.prg32.test`. If you are
+running only the direct backend process instead, use its explicit HTTP origin
+instead of the HTTPS host above. For a custom local suffix, use the matching
+value from `PRG32_API_ORIGIN`.
 
 The Store returns a pending submission. An editor must verify it before the
 game appears in `GET /api/games`. See [Getting Started](getting_started.md)

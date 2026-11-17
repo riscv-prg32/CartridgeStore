@@ -1,0 +1,23 @@
+---
+title: Metrics and runs
+description: Understand the bounded run and sample contracts used for performance measurements.
+---
+
+The optional streaming metrics pipeline records runs and frame samples. Run detail, sample exports, and report exports are protected by the API's owner/admin authorization policy.
+
+| Field | Unit or meaning |
+| --- | --- |
+| `frame_us` | Microseconds of frame work |
+| `update_us`, `draw_us`, `present_us` | Stage durations in microseconds |
+| `fps_x100` | FPS multiplied by 100 in raw samples |
+| `deadline_missed` | Whether a sample missed its deadline |
+| `dropped_samples` | Samples not retained by the run |
+
+```http
+GET /api/runs
+GET /api/runs/<run_id>
+GET /api/runs/<run_id>/samples.csv
+GET /api/runs/<run_id>/report.md
+```
+
+Public statistics use aggregate run counters. They do not expose private sample series or treat missing samples as zero.

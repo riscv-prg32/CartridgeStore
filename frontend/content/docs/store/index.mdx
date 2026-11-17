@@ -1,0 +1,25 @@
+---
+title: Build for PRG32
+description: A curated, source-driven guide to cartridges, Store APIs, publishing, scores, metrics, and multiplayer.
+---
+
+Welcome to the PRG32 Cartridge Store documentation. PRG32 is an open educational platform for small cartridges that run on physical ESP32-C6 hardware or through the QEMU workflow.
+
+This documentation focuses on the Store boundary: discovering published cartridges, downloading the correct binary for a target, publishing bundles for review, and using the public runtime APIs.
+
+## Start here
+
+- [Getting started](/docs/store/getting-started) for the platform and Store workflow.
+- [Cartridge format](/docs/store/cartridge-format) for the bundle and manifest shape.
+- [Publishing workflow](/docs/store/publishing) for submitting a release for review.
+- [Store API](/docs/store/store-api) for public endpoints and compatibility notes.
+- [Firmware API versioning](/docs/store/api-versioning) for discovery and `/api/v1` adoption.
+
+## Supported targets
+
+| Target | Identifier | Use |
+| --- | --- | --- |
+| ESP32-C6 | `esp32c6` | Physical PRG32 hardware |
+| QEMU | `qemu` | Emulator and repeatable local development |
+
+The firmware repository contains the complete toolchain and board setup guides. The Store documentation stays focused on the service contracts shared by firmware and web clients.

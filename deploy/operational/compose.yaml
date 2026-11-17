@@ -1,0 +1,157 @@
+name: prg32-operational-template
+
+# TEMPLATE ONLY. This file is intentionally not included by the root Compose
+# project and must not be started before the M5.3.3 runbook approvals.
+services:
+  fastify:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.operational
+    image: ${PRG32_FASTIFY_IMAGE:-prg32-cartridge-store-fastify:operational-template}
+    environment:
+      NODE_ENV: production
+      PRG32_BACKEND_HOST: 0.0.0.0
+      PRG32_BACKEND_PORT: "5080"
+      PRG32_BACKEND_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_STORE_DATA: /data/canonical
+      # The operational canonical mode is selected by the approved handover
+      # environment. The current disposable mode must never be used in prod.
+      PRG32_BACKEND_CATALOG_READ_MODE: canonical-operational
+      PRG32_BACKEND_CANONICAL_STORAGE_ROOT: /data/canonical
+      PRG32_BACKEND_CANONICAL_READ_AUTHORIZATION_FILE: /run/secrets/prg32-operational-canonical-read-authorization
+      PRG32_BACKEND_CANONICAL_WORKFLOW_MODE: operational
+      PRG32_BACKEND_CANONICAL_WRITE_AUTHORIZATION_FILE: /run/secrets/prg32-operational-canonical-write-authorization
+      PRG32_BACKEND_AUTH_WRITE_ENABLED: "true"
+      PRG32_BACKEND_AUTH_WRITE_MODE: operational
+      PRG32_BACKEND_AUTH_WRITE_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_AUTH_DISPOSABLE_ROOT: /data/canonical
+      PRG32_BACKEND_SESSION_SECRET_FILE: /run/secrets/prg32-operational-session-secret
+      PRG32_BACKEND_BOOTSTRAP_TOKEN_FILE: /run/secrets/prg32-operational-bootstrap-token
+      PRG32_BACKEND_SESSION_SECURE: "true"
+      PRG32_BACKEND_SESSION_SAMESITE: lax
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_COOKIE_DOMAIN:?set the production cookie domain}
+      PRG32_BACKEND_TRUST_PROXY: "true"
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_FRONTEND_PUBLIC_ORIGIN:?set the production storefront origin}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the production API origin}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the production API origin}
+      PRG32_BACKEND_CORS_ORIGINS: ${PRG32_FRONTEND_PUBLIC_ORIGIN:?set the production storefront origin}
+      PRG32_BACKEND_EMAIL_TRANSPORT: smtp
+      PRG32_BACKEND_EMAIL_SMTP_HOST: mailpit
+      PRG32_BACKEND_EMAIL_SMTP_PORT: "1025"
+      # Exact internal SMTP host exception; override through the operator's
+      # environment when the approved mail relay is not named mailpit.
+      PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST: ${PRG32_SETUP_NETWORK_TEST_ALLOWLIST:-mailpit}
+      PRG32_BACKEND_EMAIL_SMTP_TLS: "false"
+      PRG32_BACKEND_EMAIL_FROM: ${PRG32_OPERATIONAL_EMAIL_FROM:?set an approved sender address}
+      PRG32_BACKEND_BACKUP_ENABLED: "false"
+      PRG32_BACKEND_SECRET_ENCRYPTION_ENABLED: "true"
+      PRG32_BACKEND_SECRET_KEY_REGISTRY: /run/secrets/prg32-secret-key-registry
+      PRG32_BACKEND_MDNS_ENABLED: "false"
+    volumes:
+      - type: bind
+        source: ${PRG32_OPERATIONAL_DATA_DIR:?set the canonical bind-mounted data directory}
+        target: /data/canonical
+    networks:
+      - app_private
+      - dream_edge
+      - dream_mail
+    expose:
+      - "5080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    secrets:
+      - source: prg32_secret_key_registry
+        target: prg32-secret-key-registry
+      - source: prg32_operational_canonical_read_authorization
+        target: prg32-operational-canonical-read-authorization
+      - source: prg32_operational_canonical_write_authorization
+        target: prg32-operational-canonical-write-authorization
+      - source: prg32_operational_session_secret
+        target: prg32-operational-session-secret
+      - source: prg32_operational_bootstrap_token
+        target: prg32-operational-bootstrap-token
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5080/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-api-template.rule: Host(`${PRG32_API_DOMAIN:?set the production API hostname}`)
+      traefik.http.routers.prg32-api-template.entrypoints: websecure
+      traefik.http.routers.prg32-api-template.tls: "true"
+      traefik.http.services.prg32-api-template.loadbalancer.server.port: "5080"
+
+  next:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.operational
+      args:
+        NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the production API origin}
+    image: ${PRG32_NEXT_IMAGE:-prg32-cartridge-store-next:operational-template}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_API_PUBLIC_ORIGIN:?set the production API origin}
+      NEXT_PUBLIC_PRG32_WS_URL: ${PRG32_API_WS_URL:?set the production WebSocket URL}
+    depends_on:
+      fastify:
+        condition: service_healthy
+    networks:
+      - app_private
+      - dream_edge
+    expose:
+      - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-store-template.rule: Host(`${PRG32_STORE_DOMAIN:?set the production storefront hostname}`)
+      traefik.http.routers.prg32-store-template.entrypoints: websecure
+      traefik.http.routers.prg32-store-template.tls: "true"
+      traefik.http.services.prg32-store-template.loadbalancer.server.port: "3000"
+
+networks:
+  app_private:
+    driver: bridge
+    internal: true
+  dream_edge:
+    name: ${DREAM_EDGE_NETWORK:-dream_edge}
+    external: true
+  dream_mail:
+    name: ${DREAM_MAIL_NETWORK:-dream_mail}
+    external: true
+
+secrets:
+  prg32_secret_key_registry:
+    file: ${PRG32_OPERATIONAL_KEY_REGISTRY_FILE:?provide an external 0600 key registry file}
+  prg32_operational_canonical_read_authorization:
+    file: ${PRG32_OPERATIONAL_SECRET_DIR:?set secret directory}/canonical-read-authorization
+  prg32_operational_canonical_write_authorization:
+    file: ${PRG32_OPERATIONAL_SECRET_DIR:?set secret directory}/canonical-write-authorization
+  prg32_operational_session_secret:
+    file: ${PRG32_OPERATIONAL_SECRET_DIR:?provide an external operational secret directory}/session-secret
+  prg32_operational_bootstrap_token:
+    file: ${PRG32_OPERATIONAL_SECRET_DIR:?provide an external operational secret directory}/bootstrap-token

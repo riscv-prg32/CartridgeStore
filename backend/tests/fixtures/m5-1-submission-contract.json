@@ -1,0 +1,13 @@
+{
+  "success": {
+    "status": "pending",
+    "review_required": true,
+    "id": "org.example.submission",
+    "version": "1.0.0",
+    "architecture": "qemu",
+    "file": "game-qemu.prg32"
+  },
+  "legacy_endpoint": true,
+  "unauthenticated_status": 401,
+  "invalid_request_status": 400
+}

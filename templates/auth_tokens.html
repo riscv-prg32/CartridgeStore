@@ -13,6 +13,7 @@
   {% endif %}
 
   <form method="post" action="/auth/tokens">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>Token label<input name="label" maxlength="80" placeholder="Development laptop" required></label>
     <button type="submit">Create token</button>
   </form>
@@ -29,6 +30,7 @@
         <tr>
           <td>
             <form method="post" action="/auth/tokens/{{ token.id }}/update" class="token-inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input name="label" value="{{ token.label }}" maxlength="80" required aria-label="Token label">
               <button type="submit">Rename</button>
             </form>
@@ -37,6 +39,7 @@
           <td>{{ token.last_used or "Never" }}</td>
           <td>
             <form method="post" action="/auth/tokens/{{ token.id }}/revoke" onsubmit="return confirm('Revoke this token?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="danger">Revoke</button>
             </form>
           </td>

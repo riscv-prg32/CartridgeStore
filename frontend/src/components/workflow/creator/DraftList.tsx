@@ -1,0 +1,16 @@
+"use client";
+
+import { useState } from "react";
+
+import { workflowErrorMessage } from "../../../lib/api/workflow";
+import { Button } from "../../ui/button";
+import { StatusMessage } from "../../ui/status";
+import { WorkflowMessage } from "../WorkflowGuard";
+import { useCreatorDrafts } from "./use-creator-drafts";
+
+export function DraftList() {
+  const state = useCreatorDrafts();
+  const [selected, setSelected] = useState<string | null>(null);
+
+  return <section className="surface-card p-5 sm:p-6" aria-labelledby="drafts-heading"><div className="flex flex-col justify-between gap-3 border-b border-[var(--color-border)] pb-4 sm:flex-row sm:items-end"><div><p className="technical-label text-[var(--color-primary)]">Private staging</p><h2 id="drafts-heading" className="mt-1 text-lg font-bold">Saved drafts</h2><p className="mt-1 text-sm text-[var(--color-text-muted)]">Draft metadata and staged bundles persist on the canonical server.</p></div><Button size="sm" type="button" loading={state.create.isPending} onClick={() => state.create.mutate()}>New draft</Button></div>{state.drafts.isPending && <p className="mt-4 text-sm text-[var(--color-text-muted)]" role="status">Loading drafts…</p>}{state.drafts.error && <WorkflowMessage tone="error">{workflowErrorMessage(state.drafts.error)}</WorkflowMessage>}{state.drafts.data?.drafts.length === 0 && <p className="mt-4 text-sm text-[var(--color-text-muted)]">No saved drafts.</p>}<ul className="mt-4 space-y-2">{state.drafts.data?.drafts.map((draft) => <li key={draft.id} className="rounded-md border border-[var(--color-border)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{draft.source_submission_id ? `Revision of #${draft.source_submission_id}` : "New cartridge draft"}</p><p className="text-xs text-[var(--color-text-muted)]">{draft.id} · {draft.status} · {draft.has_artifact ? "bundle attached" : "bundle missing"}</p></div>{draft.status === "draft" && <div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-semibold hover:bg-[var(--color-surface-muted)]">Attach ZIP<input aria-label={`Attach ZIP to draft ${draft.id}`} className="sr-only" type="file" accept=".zip,application/zip" onChange={(event) => { const file = event.target.files?.[0]; if (file) state.attach.mutate({ id: draft.id, file }); }} /></label><Button size="sm" type="button" loading={state.submit.isPending} disabled={!draft.has_artifact} onClick={() => { setSelected(draft.id); state.submit.mutate(draft.id); }}>Submit</Button><Button size="sm" type="button" variant="danger" loading={state.remove.isPending} onClick={() => state.remove.mutate(draft.id)}>Delete</Button></div>}</div></li>)}</ul>{selected && <StatusMessage tone="muted" className="mt-3 border-0 bg-transparent px-0 py-0">Draft selected: {selected}</StatusMessage>}{(state.attach.error || state.submit.error || state.remove.error) && <WorkflowMessage tone="error">{workflowErrorMessage(state.attach.error ?? state.submit.error ?? state.remove.error)}</WorkflowMessage>}{state.submit.isSuccess && <StatusMessage tone="success" className="mt-3 border-0 bg-transparent px-0 py-0">Draft submitted for review.</StatusMessage>}</section>;
+}

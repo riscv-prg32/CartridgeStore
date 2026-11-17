@@ -1,0 +1,11 @@
+{
+  "title": "Tutorials",
+  "description": "Step-by-step classroom projects and publishing exercises.",
+  "icon": "GraduationCap",
+  "pages": [
+    "first-project",
+    "catch-game",
+    "publish-to-store",
+    "teacher-lab"
+  ]
+}

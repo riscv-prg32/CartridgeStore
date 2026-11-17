@@ -1,0 +1,13 @@
+{
+  "title": "Computer Architecture",
+  "description": "RISC-V, PRG32 setup, and foundational architecture lessons.",
+  "icon": "Binary",
+  "root": true,
+  "pages": [
+    "index",
+    "course-introduction",
+    "prg32-setup",
+    "first-riscv-assembly",
+    "history-of-computing"
+  ]
+}

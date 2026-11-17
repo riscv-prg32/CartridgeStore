@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily PRG32 Cartridge Store local backup schedule
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=prg32-backup.service
+
+[Install]
+WantedBy=timers.target

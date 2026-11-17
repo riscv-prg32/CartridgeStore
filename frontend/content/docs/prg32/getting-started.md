@@ -1,0 +1,223 @@
+---
+title: Getting started
+---
+
+# Getting Started With PRG32
+This guide starts from an empty working directory and finishes with a small `hello_world.prg32` cartridge that can run in QEMU, upload to a physical ESP32-C6 PRG32 board, and be packaged for a Cartridge Store.
+
+PRG32 has two related development loops:
+- resident firmware development, where `idf.py` or PlatformIO builds the PRG32 runtime for the board or QEMU;
+- cartridge game development, where `python3 -m prg32` links a small RISC-V assembly or C program against the portable PRG32 ABI table and produces a `.prg32` game package.
+
+The resident firmware and cartridges must agree on the portable ABI major, hash, and required feature bits. Incompatible cartridges are rejected cleanly.
+## 1. Choose The Environment
+There are two environments to run PRG32: the **ESP-IDF + Tooling** environment or the **PlatformIO** environment.
+
+The ESP-IDF + Tooling environment is the recommended one. This environment uses the provided [Python Tooling](tooling.md).
+
+You can use PlatformIO when you want a convenient VS Code workflow for the physical ESP32-C6 firmware.  The checked-in PlatformIO environment can only be used with the physical ESP32-C6 board, not for QEMU.
+
+| Task                                       | Recommended environment       |
+| ------------------------------------------ | ----------------------------- |
+| Build resident firmware for ESP32-C6       | ESP-IDF + Tooling, PlatformIO |
+| Flash and monitor physical board           | ESP-IDF + Tooling, PlatformIO |
+| Build QEMU firmware and run virtual screen | ESP-IDF + Tooling             |
+| Build `.prg32` cartridges                  | ESP-IDF + Tooling             |
+| Package/publish Cartridge Store bundles    | ESP-IDF + Tooling             |
+| Modify PRG32 framework internals           | ESP-IDF + Tooling             |
+## 2. Install
+If you have not installed PRG32 yet, follow the Install & Setup guide in the [PRG32 README](https://github.com/riscv-prg32/PRG32#readme).
+## 3. Build
+If you are using the **ESP-IDF + Tooling** environment, the `python -m prg32` package is available to execute commands.
+
+> [!IMPORTANT]
+> Remember to always source the file `export.sh` in the ESP-IDF directory you previously created before using PRG32 in a new shell.
+
+It is recommended for users to create an alias for sourcing ESP-IDF and using the PRG32 tools:
+```bash
+alias get_idf=". $HOME/esp-idf/export.sh"
+alias prg="python -m prg32"
+```
+### Running PRG32 on the ESP32C6
+If you have the physical PRG32 hardware, after following the [PRG32 hardware setup guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/hardware.md) you can build the project for the ESP32C6 and flash it to the SoC:
+```bash
+python -m prg32 esp32c6 build-and-flash
+```
+### Running PRG32 on QEMU
+If you don't have the physical hardware you can still use the PRG32 framework emulated on QEMU:
+```bash
+python -m prg32 qemu build
+```
+
+You can run the QEMU emulator to make sure everything is working correctly:
+```bash
+python -m prg32 qemu run
+```
+
+> [!IMPORTANT]
+> To interact with the QEMU emulator, your active window must be **the terminal that launched QEMU**, not the QEMU virtual screen.
+
+
+## 4. Navigate the Startup Menu
+With one stored cartridge, PRG32 starts it automatically. With several stored
+cartridges, it starts the saved default. The startup menu appears when no
+cartridge can be selected, or when you hold A+B during boot. From that menu
+you can run a cartridge, set the default, configure Wi-Fi and CartridgeStore,
+open audio or developer settings, and view the about screen. The optional
+performance-test cartridge runs matched RGB565 and full-indexed passes,
+displays an aggregate summary, and retains compact JSON at
+`/api/performance.json` until reboot or the next run. Poing can publish a
+separate application-level result when SELECT starts its performance mode.
+See the [Performance Test Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md).
+
+**Navigation Commands:**
+- **Joystick**: Navigate menus (QEMU: keyboard arrows)
+- **Button A (SET)**: Confirm selection (QEMU: keyboard 'Z')
+- **Button B (RST)**: Go back (QEMU: keyboard 'X')
+- **A + B + DOWN (Hold)**: Restart the PRG32 firmware
+- **A + B (Hold during boot)**: Force enter setup (requires `Enable A+B Setup Shortcut` to be enabled in menuconfig)
+
+Setup screens also show the active Wi-Fi mode and current IP address.
+
+## 5. Run the Hello World Cartridge
+### Create the source code for the Cartridge
+
+Create a new local game directory outside of the PRG32 folder:
+```bash
+mkdir -p ../work/hello_world
+```
+
+Create the assembly source code file:
+```bash
+touch ../work/hello_world/hello_world.S
+```
+
+Paste this source code inside the new file:
+```asm
+.option norelax
+.section .text
+.global hello_world_init
+.global hello_world_update
+.global hello_world_draw
+
+.equ PRG32_COLOR_BLACK, 0x0000
+.equ PRG32_COLOR_WHITE, 0xffff
+.equ PRG32_COLOR_CYAN,  0x07ff
+
+hello_world_init:
+    addi sp, sp, -16
+    sw ra, 12(sp)
+
+    li a0, PRG32_COLOR_BLACK
+    call prg32_gfx_clear
+
+    lw ra, 12(sp)
+    addi sp, sp, 16
+    ret
+
+hello_world_update:
+    ret
+
+hello_world_draw:
+    addi sp, sp, -16
+    sw ra, 12(sp)
+
+    li a0, PRG32_COLOR_BLACK
+    call prg32_gfx_clear
+
+    li a0, 32
+    li a1, 40
+    la a2, hello_world_title
+    li a3, PRG32_COLOR_CYAN
+    call prg32_gfx_text8
+
+    li a0, 32
+    li a1, 64
+    la a2, hello_world_line
+    li a3, PRG32_COLOR_WHITE
+    call prg32_gfx_text8
+
+    lw ra, 12(sp)
+    addi sp, sp, 16
+    ret
+
+.section .rodata
+hello_world_title:
+    .asciz "HELLO WORLD"
+hello_world_line:
+    .asciz "PRG32 cartridge from scratch"
+```
+
+The three exported symbols are the cartridge entry points:
+- `hello_world_init`;
+- `hello_world_update`;
+- `hello_world_draw`.
+
+### Run the Cartridge on QEMU
+First you need to  build the Hello World Cartridge for QEMU.
+
+```bash
+python3 -m prg32 cartridge build \
+  work/hello_world/hello_world.S \
+  --portable \
+  --entry-prefix hello_world \
+  --name hello_world \
+  --out work/hello_world/hello_world.prg32
+```
+
+Then stage the cartridge to QEMU. If QEMU is already opened, close it before running this command.
+```
+python3 -m prg32 qemu upload work/hello_world/hello_world.prg32
+```
+
+Then start QEMU:
+```bash
+python -m prg32 qemu run
+```
+
+The setup menu appears: select `Run Cartridge`, then select `cart0`. The virtual screen should show `HELLO WORLD` in the 320x200 game viewport.
+### Run the Cartridge on the ESP32C6
+First you need to  build the Hello World Cartridge for the ESP32C6.
+
+```bash
+python3 -m prg32 cartridge build \
+  work/hello_world/hello_world.S \
+  --portable \
+  --entry-prefix hello_world \
+  --name hello_world \
+  --out ../work/hello_world/hello_world.prg32
+```
+
+Boot up the ESP32C6 to the setup menu and make sure that your computer and the board are connected to the **same WiFi**.
+
+> [!TIP]
+> You can pre-configure your board's Wi-Fi connection *before* building the firmware by running:
+> `python3 -m prg32 wifi set --ssid "YourSSID" --password "YourPwd" --mode sta`
+> This avoids having to configure it on the physical board's screen.
+Upload the cartridge to the board.
+```
+python3 -m prg32 esp32c6 upload ../work/hello_world/hello_world.prg32
+```
+
+In the setup menu two new options appear: select `Run Cartridge`, then select `cart0`. The virtual screen should show `HELLO WORLD` in the 320x200 game viewport.
+
+You can also run the cartridge through the python tooling:
+```bash
+python -m prg32 esp32c6 run --url http://192.168.4.1 --slot cart0
+```
+
+For any errors, before opening a GitHub issue, please consult the [Troubleshooting guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/troubleshooting.md).
+
+## 6. What To Read Next
+
+- For uploading your cartridge to the Cartridge Store, read the local [Cartridge Store guide](/docs/prg32/cartridge-store).
+- For complete setup verification, follow the [PRG32 setup verification guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/setup_verification.md).
+
+- `docs/cartridges.md`: deeper cartridge workflow and slot behavior.
+- `docs/qemu.md`: host-specific QEMU setup and troubleshooting.
+- `docs/tutorial.md`: first assembly game tutorial.
+- `docs/tutorial_graphic_game.md`: graphics assembly tutorial.
+- `docs/tutorial_c_game.md`: C cartridge tutorial.
+- `docs/api.md`: board HTTP API and Cartridge Store API reference.
+- `docs/framework_manual.md`: PRG32 runtime API and ABI details.
+- `docs/assets.md`: image, sprite, tile, GIF, and audio asset conversion.

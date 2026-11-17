@@ -1,0 +1,17 @@
+{
+  "title": "Construction Kit",
+  "description": "Build games with blocks, sprites, generated C, and cartridges.",
+  "icon": "Blocks",
+  "root": true,
+  "pages": [
+    "index",
+    "setup",
+    "how-to",
+    "blockly",
+    "sprite-editor",
+    "cartridge-build",
+    "generated-code",
+    "cartridge-store-publish",
+    "tutorials"
+  ]
+}

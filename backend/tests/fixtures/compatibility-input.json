@@ -1,0 +1,185 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "compat-publisher",
+      "email": "publisher@example.test",
+      "password_hash": "scrypt:32768:8:1$Sg8aDcBd0VcXm3ND$d032cc543048ff7d120b153c5af84f22d2c4592f80e9636b60069ccc532fc8d7b1147bf7340295488f2a7d0a9d61c6161ee73bef31632414a4ede2c18a100c7d",
+      "role": "publisher",
+      "external_id": null,
+      "external_provider": null,
+      "created_at": "2026-01-02 03:04:05",
+      "last_login": null
+    },
+    {
+      "id": 2,
+      "username": "管理员",
+      "email": "admin@example.test",
+      "password_hash": "pbkdf2:sha256:600000$YUTAFnUZUsPs9rtF$e13711f5c844a57db62d1b0c39f38df75efe429fac070e49da0b5c75710750f4",
+      "role": "admin",
+      "external_id": "idp-π",
+      "external_provider": "oidc",
+      "created_at": "2026-01-02 03:04:06",
+      "last_login": "2026-01-03T04:05:06Z"
+    }
+  ],
+  "groups": [
+    { "id": 1, "name": "editors", "created_at": "2026-01-02 03:04:07" },
+    { "id": 2, "name": "telemetry", "created_at": "2026-01-02 03:04:08" }
+  ],
+  "user_groups": [
+    { "user_id": 1, "group_id": 1 },
+    { "user_id": 2, "group_id": 1 },
+    { "user_id": 2, "group_id": 2 }
+  ],
+  "api_tokens": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "token_hash": "5ee3efe101e958138a4c71cdd872a470fae53524d99badb44cd9009cc3ead098",
+      "label": "synthetic firmware",
+      "created_at": "2026-01-02 03:04:09",
+      "last_used": null
+    }
+  ],
+  "registration_tokens": [
+    {
+      "id": 1,
+      "email": "new@example.test",
+      "token_hash": "3c30e03b0214dd16939aa0c30a7dc4f090bc2de4cb2d8cf775d541061df8f4a1",
+      "created_at": "2026-01-02 03:04:10",
+      "expires_at": "2026-01-03 03:04:10",
+      "used_at": null
+    }
+  ],
+  "store_settings": [
+    { "key": "store_name", "value": "PRG32 π Store" },
+    { "key": "auth_allow_registration", "value": "false" },
+    { "key": "empty_setting", "value": "" }
+  ],
+  "runs": [
+    {
+      "run_id": "run-compat-1",
+      "board_id": "board-π",
+      "target": "esp32c6",
+      "display_backend": "ili9341",
+      "firmware_version": "1.2.3",
+      "firmware_git_sha": "abc123",
+      "game_name": "Compat Game",
+      "sample_period_frames": 2,
+      "started_at": 1700000000123,
+      "finished_at": null,
+      "dropped_samples": 0,
+      "created_at": 1700000000,
+      "submitted_by": "compat-publisher",
+      "user_id": 1
+    }
+  ],
+  "samples": [
+    {
+      "id": 1,
+      "run_id": "run-compat-1",
+      "frame": 0,
+      "timestamp_ms": 1700000000123,
+      "update_us": 100,
+      "draw_us": 200,
+      "present_us": 300,
+      "frame_us": 600,
+      "heap_free": 123456,
+      "heap_min_free": 120000,
+      "input_mask": 5,
+      "fps_x100": 5999,
+      "upload_queue_depth": 0,
+      "deadline_missed": 0,
+      "created_at": 1700000000
+    },
+    {
+      "id": 2,
+      "run_id": "run-compat-1",
+      "frame": 2,
+      "timestamp_ms": 1700000000456,
+      "update_us": 101,
+      "draw_us": 201,
+      "present_us": 301,
+      "frame_us": 603,
+      "heap_free": 123000,
+      "heap_min_free": 119000,
+      "input_mask": 0,
+      "fps_x100": 6000,
+      "upload_queue_depth": 1,
+      "deadline_missed": 1,
+      "created_at": 1700000000
+    }
+  ],
+  "scores": [
+    { "id": 1, "game": "compat-game", "player": "玩家", "score": 9001, "created_at": 1700000010, "submitted_by": "compat-publisher" }
+  ],
+  "download_events": [
+    { "id": 1, "game_id": "compat-game", "version": "1.0.0", "architecture": "esp32c6", "user_id": null, "ip_hash": "hash", "user_agent": "synthetic-agent", "downloaded_at": "2026-01-02 03:04:11" }
+  ],
+  "cartridge_submissions": [
+    {
+      "id": 1,
+      "game_id": "compat-game",
+      "version": "1.0.0",
+      "status": "pending",
+      "submitted_by_user_id": 1,
+      "submitted_by": "compat-publisher",
+      "reviewed_by_user_id": null,
+      "reviewed_by": "",
+      "pending_dir": "pending/1",
+      "metadata_json": "{\"abi\":\"prg32-metadata-1.0\",\"authors\":[{\"name\":\"Åuthor\"}],\"id\":\"compat-game\",\"tags\":[\"demo\",\"π\"],\"title\":\"Compat Game\",\"version\":\"1.0.0\"}",
+      "architectures_json": "[{\"architecture\":\"esp32c6\",\"file\":\"esp32c6.prg32\"},{\"architecture\":\"qemu\",\"file\":\"qemu.prg32\"}]",
+      "created_at": "2026-01-02 03:04:12",
+      "reviewed_at": null
+    }
+  ],
+  "token_cases": {
+    "api": "synthetic-api-token",
+    "registration": "synthetic-registration-token"
+  },
+  "password_cases": {
+    "valid": "Compat-Password-123!",
+    "invalid": "wrong-password"
+  },
+  "catalog_index": {
+    "abi": "prg32-cartridge-store-index-1.0",
+    "updated_at": "2026-01-02T03:04:13Z",
+    "games": {
+      "compat-game": {
+        "id": "compat-game",
+        "title": "Compat Game",
+        "summary": "Unicode π summary",
+        "authors": [{ "name": "Åuthor" }],
+        "tags": ["demo", "π"],
+        "latest_version": "1.0.0",
+        "updated_at": "2026-01-02T03:04:13Z",
+        "versions": {
+          "1.0.0": {
+            "version": "1.0.0",
+            "published_at": "2026-01-02T03:04:13Z",
+            "metadata": {
+              "abi": "prg32-metadata-1.0",
+              "id": "compat-game",
+              "title": "Compat Game",
+              "version": "1.0.0",
+              "authors": [{ "name": "Åuthor" }],
+              "tags": ["demo", "π"]
+            },
+            "colophon": null,
+            "architectures": {
+              "esp32c6": {
+                "architecture": "esp32c6",
+                "filename": "cartridges/compat-game/1.0.0/esp32c6.prg32",
+                "size": 6,
+                "sha256": "2aee64cbd32a4b85240fd4ca7a054a03012457099cdc860c08e61ef1ad9eabb1",
+                "has_screenshot": false
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "catalog_binary_hex": "0050524732ff"
+}

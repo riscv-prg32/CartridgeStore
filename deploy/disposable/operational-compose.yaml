@@ -1,0 +1,126 @@
+name: prg32-m534-disposable-operational
+
+services:
+  fastify:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.operational
+    image: prg32-cartridge-store-fastify:m534-operational-test
+    environment:
+      NODE_ENV: production
+      PRG32_BACKEND_HOST: 0.0.0.0
+      PRG32_BACKEND_PORT: "5080"
+      PRG32_BACKEND_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_STORE_DATA: /data/canonical
+      PRG32_BACKEND_CATALOG_READ_MODE: canonical-operational
+      PRG32_BACKEND_CANONICAL_STORAGE_ROOT: /data/canonical
+      PRG32_BACKEND_CANONICAL_READ_AUTHORIZATION: m534-disposable-operational-read-authorization
+      PRG32_BACKEND_CANONICAL_WORKFLOW_MODE: operational
+      PRG32_BACKEND_CANONICAL_WRITE_AUTHORIZATION: m534-disposable-operational-write-authorization
+      PRG32_BACKEND_AUTH_WRITE_ENABLED: "true"
+      PRG32_BACKEND_AUTH_WRITE_MODE: operational
+      PRG32_BACKEND_AUTH_WRITE_DB: /data/canonical/store.sqlite
+      PRG32_BACKEND_AUTH_DISPOSABLE_ROOT: /data/canonical
+      PRG32_BACKEND_SESSION_SECRET: m534-disposable-operational-session-secret
+      PRG32_BACKEND_BOOTSTRAP_TOKEN: m534-disposable-operational-bootstrap-token
+      PRG32_BACKEND_SESSION_SECURE: "true"
+      PRG32_BACKEND_SESSION_SAMESITE: lax
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_M534_COOKIE_DOMAIN:-.m52g14.test}
+      PRG32_BACKEND_TRUST_PROXY: "true"
+      NODE_EXTRA_CA_CERTS: /run/m535/provider-ca.pem
+      PRG32_MP_MAX_PEERS: "2"
+      # The disposable browser matrix shares one synthetic client address
+      # across sixteen journeys; keep production's policy unchanged while
+      # preventing cross-test rate-limit coupling.
+      PRG32_BACKEND_AUTH_RATE_LIMIT_MAX: "200"
+      PRG32_BACKEND_AUTH_RATE_LIMIT_WINDOW_SECONDS: "60"
+      PRG32_BACKEND_WEBAUTHN_ENABLED: ${PRG32_M534_WEBAUTHN_ENABLED:-true}
+      PRG32_BACKEND_WEBAUTHN_RP_ID: ${PRG32_M534_WEBAUTHN_RP_ID:-store.m52g14.test}
+      PRG32_BACKEND_WEBAUTHN_RP_NAME: PRG32 Disposable Store
+      PRG32_BACKEND_WEBAUTHN_ORIGINS: ${PRG32_M534_WEBAUTHN_ORIGINS:-https://store.m52g14.test}
+      PRG32_BACKEND_FRONTEND_PUBLIC_ORIGIN: ${PRG32_M534_STORE_ORIGIN:-https://store.prg32.test}
+      PRG32_BACKEND_FEDERATION_PUBLIC_ORIGIN: ${PRG32_M534_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_OIDC_PUBLIC_ORIGIN: ${PRG32_M534_API_ORIGIN:-https://api.prg32.test}
+      PRG32_BACKEND_CORS_ORIGINS: ${PRG32_M534_CORS_ORIGIN:-https://store.prg32.test}
+      PRG32_BACKEND_EMAIL_TRANSPORT: smtp
+      PRG32_BACKEND_EMAIL_SMTP_HOST: ${PRG32_M534_SMTP_HOST:-mailpit}
+      PRG32_BACKEND_EMAIL_SMTP_PORT: "${PRG32_M534_SMTP_PORT:-1025}"
+      PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST: ${PRG32_M534_SETUP_NETWORK_TEST_ALLOWLIST:-mailpit,host.docker.internal}
+      PRG32_BACKEND_EMAIL_FROM: no-reply@prg32.test
+      PRG32_BACKEND_BACKUP_ENABLED: "false"
+      PRG32_BACKEND_SECRET_ENCRYPTION_ENABLED: "true"
+      PRG32_BACKEND_SECRET_KEY_REGISTRY: /run/secrets/prg32-secret-key-registry
+      PRG32_BACKEND_MDNS_ENABLED: "false"
+    volumes:
+      - type: bind
+        source: ${PRG32_M534_DATA_DIR:?set disposable canonical data directory}
+        target: /data/canonical
+      - type: bind
+        source: ${PRG32_M534_PROVIDER_CA:?set disposable provider CA path}
+        target: /run/m535/provider-ca.pem
+        read_only: true
+    secrets:
+      - source: prg32_secret_key_registry
+        target: prg32-secret-key-registry
+    networks: [app_private]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose: ["5080"]
+    ports:
+      - "127.0.0.1:${PRG32_M534_FASTIFY_PORT:-15080}:5080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5080/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 5s
+
+  next:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.operational
+      args:
+        NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_M534_API_ORIGIN:-https://api.prg32.test}
+    image: prg32-cartridge-store-next:m534-operational-test
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_PRG32_API_ORIGIN: ${PRG32_M534_API_ORIGIN:-https://api.prg32.test}
+      NEXT_PUBLIC_PRG32_WS_URL: ws://127.0.0.1:${PRG32_M534_FASTIFY_PORT:-15080}/api/multiplayer
+    depends_on:
+      fastify:
+        condition: service_healthy
+    networks: [app_private]
+    expose: ["3000"]
+    ports:
+      - "127.0.0.1:${PRG32_M534_NEXT_PORT:-13300}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    networks: [app_private]
+    expose: ["1025"]
+
+networks:
+  app_private:
+    driver: bridge
+
+secrets:
+  prg32_secret_key_registry:
+    file: ${PRG32_M534_KEY_REGISTRY:?set disposable secret key registry path}

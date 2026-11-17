@@ -1,0 +1,14 @@
+---
+title: Multiplayer
+description: Connect to the Store's same-origin WebSocket relay using the PRG32 frame vocabulary.
+---
+
+The multiplayer relay is exposed at `/api/multiplayer` on the Store host. The relay carries small JSON messages and keeps the WebSocket on the same HTTP origin as the rest of the service.
+
+```json
+{"type":"join","signature":"pong-v1","flags":1,"player_id":123}
+{"type":"state","x":120,"y":80,"sprite":0,"flags":0,"input":2,"frame":42}
+{"type":"leave"}
+```
+
+Signatures may contain letters, digits, underscore, hyphen, dot, and colon within the documented length limit. Check `/api/multiplayer/status` before presenting multiplayer controls.

@@ -1,0 +1,46 @@
+# Explicit Dream integration overlay. It is never loaded by standalone
+# Compose unless the operator intentionally supplies this file and has already
+# created the external Dream networks.
+services:
+  fastify:
+    environment:
+      PRG32_BACKEND_TRUST_PROXY: "true"
+      PRG32_BACKEND_SESSION_COOKIE_DOMAIN: ${PRG32_SESSION_COOKIE_DOMAIN:-.prg32.test}
+      PRG32_BACKEND_EMAIL_TRANSPORT: smtp
+      PRG32_BACKEND_EMAIL_SMTP_HOST: mailpit
+      PRG32_BACKEND_EMAIL_SMTP_PORT: "1025"
+      PRG32_BACKEND_EMAIL_FROM: ${PRG32_DREAM_EMAIL_FROM:?set an approved Dream sender}
+      PRG32_BACKEND_SETUP_NETWORK_TEST_ALLOWLIST: mailpit
+    networks:
+      - app_private
+      - dream_edge
+      - dream_mail
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-api-standalone.rule: Host(`${PRG32_DREAM_API_HOST:-api.prg32.test}`)
+      traefik.http.routers.prg32-api-standalone.entrypoints: websecure
+      traefik.http.routers.prg32-api-standalone.tls: "true"
+      traefik.http.services.prg32-api-standalone.loadbalancer.server.port: "5080"
+
+  next:
+    environment:
+      NEXT_PUBLIC_PRG32_WS_URL: ${PRG32_DREAM_WS_URL:-wss://api.prg32.test/api/multiplayer}
+    networks:
+      - app_private
+      - dream_edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DREAM_EDGE_NETWORK:-dream_edge}
+      traefik.http.routers.prg32-store-standalone.rule: Host(`${PRG32_DREAM_STORE_HOST:-store.prg32.test}`)
+      traefik.http.routers.prg32-store-standalone.entrypoints: websecure
+      traefik.http.routers.prg32-store-standalone.tls: "true"
+      traefik.http.services.prg32-store-standalone.loadbalancer.server.port: "3000"
+
+networks:
+  dream_edge:
+    name: ${DREAM_EDGE_NETWORK:-dream_edge}
+    external: true
+  dream_mail:
+    name: ${DREAM_MAIL_NETWORK:-dream_mail}
+    external: true

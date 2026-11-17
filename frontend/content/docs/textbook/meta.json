@@ -1,0 +1,9 @@
+{
+  "title": "Textbook",
+  "description": "The PRG32 learning path from first contact to capstone projects.",
+  "icon": "BookOpen",
+  "root": true,
+  "pages": [
+    "index"
+  ]
+}

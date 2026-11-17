@@ -1,0 +1,70 @@
+# Generic local Traefik edge. It does not depend on Dream Platform.
+services:
+  traefik:
+    image: traefik:v3.3
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    ports:
+      - "${PRG32_HTTP_BIND:-0.0.0.0}:${PRG32_HTTP_PORT:-80}:80"
+      - "${PRG32_HTTPS_BIND:-0.0.0.0}:${PRG32_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${PRG32_TLS_DIR:-./.local/tls}:/etc/traefik/tls:ro
+      - ./deploy/local/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - edge
+    restart: unless-stopped
+
+  backend:
+    networks:
+      - app
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${PRG32_TRAEFIK_NETWORK:-prg32_edge}
+      traefik.http.routers.prg32-api.rule: Host(`${PRG32_API_DOMAIN:-api.prg32.test}`)
+      traefik.http.routers.prg32-api.entrypoints: websecure
+      traefik.http.routers.prg32-api.tls: "true"
+      traefik.http.services.prg32-api.loadbalancer.server.port: "5090"
+
+  next:
+    networks:
+      - app
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${PRG32_TRAEFIK_NETWORK:-prg32_edge}
+      traefik.http.routers.prg32-store.rule: Host(`${PRG32_STORE_DOMAIN:-store.prg32.test}`)
+      traefik.http.routers.prg32-store.entrypoints: websecure
+      traefik.http.routers.prg32-store.tls: "true"
+      traefik.http.routers.prg32-store.priority: "1"
+      traefik.http.services.prg32-store.loadbalancer.server.port: "3000"
+
+  docs:
+    networks:
+      - app
+      - edge
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${PRG32_TRAEFIK_NETWORK:-prg32_edge}
+      traefik.http.routers.prg32-docs.rule: "Host(`${PRG32_STORE_DOMAIN:-store.prg32.test}`) && (Path(`/docs`) || PathPrefix(`/docs/`))"
+      traefik.http.routers.prg32-docs.entrypoints: websecure
+      traefik.http.routers.prg32-docs.tls: "true"
+      traefik.http.routers.prg32-docs.priority: "100"
+      traefik.http.services.prg32-docs.loadbalancer.server.port: "3000"
+
+  nginx:
+    profiles:
+      - standalone
+
+networks:
+  app:
+    name: prg32_store_dev
+  edge:
+    name: ${PRG32_TRAEFIK_NETWORK:-prg32_edge}

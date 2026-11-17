@@ -1,0 +1,7 @@
+import Link from "next/link";
+
+import { documentation } from "../../lib/docs/content";
+
+export function DocumentationIndex() {
+  return <main className="page-gutter py-10"><header className="mb-8 max-w-3xl"><p className="technical-label text-[var(--color-primary)]">Developer documentation</p><h1 className="mt-2 text-4xl font-bold tracking-tight">Build for PRG32</h1><p className="mt-3 text-[var(--color-text-muted)]">A curated, source-driven guide to cartridges, Store APIs, publishing, scores, metrics, and multiplayer. Internal modernization reports and private infrastructure details stay out of this public section.</p></header><div className="card-grid">{documentation.map((article) => <Link key={article.slug} href={`/docs/${article.slug}`} className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition hover:border-[var(--color-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"><p className="technical-label text-[var(--color-primary)]">{article.category}</p><h2 className="mt-3 text-lg font-bold group-hover:text-[var(--color-primary-strong)]">{article.title}</h2><p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{article.summary}</p><span className="mt-5 inline-block text-sm font-semibold text-[var(--color-primary-strong)]">Read article →</span></Link>)}</div></main>;
+}

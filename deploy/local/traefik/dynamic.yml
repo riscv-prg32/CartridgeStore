@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /etc/traefik/tls/prg32-local.pem
+      keyFile: /etc/traefik/tls/prg32-local-key.pem

@@ -16,6 +16,10 @@ eggs/
 .eggs/
 lib/
 lib64/
+# `lib/` above is the Python packaging default; frontend source modules are
+# repository files and must remain visible to version control.
+!/frontend/src/lib/
+!/frontend/src/lib/**
 parts/
 sdist/
 var/
@@ -154,11 +158,33 @@ activemq-data/
 .env
 .envrc
 .venv
+.venv*/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Next.js frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.next-*/
+frontend/.source/
+frontend/out/
+frontend/coverage/
+frontend/test-results/
+docs-site/.next/
+docs-site/.source/
+docs-site/coverage/
+docs-site/.DS_Store
+*.tsbuildinfo
+.dev-data/
+.local/
+
+# Local Node and pnpm artifacts
+node_modules/
+pnpm-lock.yaml
+!docs-site/pnpm-lock.yaml
 
 # Spyder project settings
 .spyderproject
@@ -219,3 +245,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local secret-key registries and migration capsules
+.secrets/
+# Disposable Authentik/Playwright integration reports; never commit browser artifacts.
+/tests/integration/authentik/reports/

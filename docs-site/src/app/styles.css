@@ -1,0 +1,99 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/purple.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* Keep the documentation-area switcher above search, like the Fumadocs hub pattern. */
+#nd-sidebar > div.flex.flex-col.gap-3.p-4.pb-2 > :nth-child(2),
+#nd-sidebar-mobile > div.flex.flex-col.gap-3.p-4.pb-2 > :nth-child(2) {
+  order: 3;
+}
+
+#nd-sidebar > div.flex.flex-col.gap-3.p-4.pb-2 > :nth-child(3),
+#nd-sidebar-mobile > div.flex.flex-col.gap-3.p-4.pb-2 > :nth-child(3) {
+  order: 2;
+}
+
+/* Make the pages inside the selected documentation area read as a tree. */
+#nd-sidebar a[href^="/docs/architecture/"],
+#nd-sidebar a[href^="/docs/construction-kit/"],
+#nd-sidebar a[href^="/docs/prg32/"],
+#nd-sidebar a[href^="/docs/store/"],
+#nd-sidebar a[href^="/docs/textbook/"],
+#nd-sidebar-mobile a[href^="/docs/architecture/"],
+#nd-sidebar-mobile a[href^="/docs/construction-kit/"],
+#nd-sidebar-mobile a[href^="/docs/prg32/"],
+#nd-sidebar-mobile a[href^="/docs/store/"],
+#nd-sidebar-mobile a[href^="/docs/textbook/"] {
+  margin-inline-start: 0.75rem;
+  border-inline-start: 1px solid var(--color-fd-border);
+  padding-inline-start: calc(2 * var(--spacing) + 1rem) !important;
+}
+
+#nd-sidebar a[href="/docs/store/store-api"],
+#nd-sidebar-mobile a[href="/docs/store/store-api"] {
+  margin-inline-start: 0;
+  border-inline-start: 0;
+  padding-inline-start: calc(2 * var(--spacing)) !important;
+}
+
+#nd-sidebar a[href^="/docs/architecture/"][data-active="true"],
+#nd-sidebar a[href^="/docs/construction-kit/"][data-active="true"],
+#nd-sidebar a[href^="/docs/prg32/"][data-active="true"],
+#nd-sidebar a[href^="/docs/store/"][data-active="true"],
+#nd-sidebar a[href^="/docs/textbook/"][data-active="true"],
+#nd-sidebar-mobile a[href^="/docs/architecture/"][data-active="true"],
+#nd-sidebar-mobile a[href^="/docs/construction-kit/"][data-active="true"],
+#nd-sidebar-mobile a[href^="/docs/prg32/"][data-active="true"],
+#nd-sidebar-mobile a[href^="/docs/store/"][data-active="true"],
+#nd-sidebar-mobile a[href^="/docs/textbook/"][data-active="true"] {
+  border-inline-start-color: var(--color-fd-primary);
+}
+
+:root {
+  color-scheme: light;
+  --color-fd-background: #fbf9ff;
+  --color-fd-foreground: #282238;
+  --color-fd-muted: #f4f0fb;
+  --color-fd-muted-foreground: #746b82;
+  --color-fd-card: #f8f5fc;
+  --color-fd-card-foreground: #302744;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #282238;
+  --color-fd-border: #e4dced;
+  --color-fd-primary: #7045d8;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-accent: #eee7ff;
+  --color-fd-accent-foreground: #5931bc;
+  --color-fd-secondary: #f0eafb;
+  --color-fd-secondary-foreground: #302744;
+  --color-fd-ring: #8b5cf6;
+}
+
+.dark {
+  --color-fd-background: #171321;
+  --color-fd-foreground: #f7f2ff;
+  --color-fd-muted: #241d35;
+  --color-fd-muted-foreground: #c8bddb;
+  --color-fd-card: #211a30;
+  --color-fd-card-foreground: #f7f2ff;
+  --color-fd-popover: #1e182c;
+  --color-fd-popover-foreground: #f7f2ff;
+  --color-fd-border: #493b62;
+  --color-fd-primary: #b79bff;
+  --color-fd-primary-foreground: #241a3b;
+  --color-fd-accent: #37265f;
+  --color-fd-accent-foreground: #eee5ff;
+  --color-fd-secondary: #2d2440;
+  --color-fd-secondary-foreground: #f7f2ff;
+  --color-fd-ring: #c4aaff;
+}
+
+html,
+body {
+  min-width: 320px;
+}
+
+body {
+  margin: 0;
+  background: var(--color-fd-background);
+}
