@@ -4,8 +4,8 @@ import { accountNavigation, navigationIsActive, PUBLIC_NAVIGATION } from "./navi
 
 describe("navigation model", () => {
   it("keeps the public surface focused on discovery", () => {
-    expect(PUBLIC_NAVIGATION.map((item) => item.label)).toEqual(["Explore", "Leaderboards", "Statistics", "Documentation"]);
-    expect(PUBLIC_NAVIGATION.map((item) => item.href)).toEqual(["/explore", "/scores", "/stats", "/docs"]);
+    expect(PUBLIC_NAVIGATION.map((item) => item.label)).toEqual(["Explore", "Leaderboards", "Statistics", "Firmware", "Documentation"]);
+    expect(PUBLIC_NAVIGATION.map((item) => item.href)).toEqual(["/explore", "/scores", "/stats", "/firmware", "/docs"]);
     expect(PUBLIC_NAVIGATION.map((item) => item.label)).not.toContain("Search");
     expect(PUBLIC_NAVIGATION.map((item) => item.href)).not.toContain("/admin");
   });

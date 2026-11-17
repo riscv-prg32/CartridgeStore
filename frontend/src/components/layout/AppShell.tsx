@@ -18,6 +18,7 @@ function publicNavigationLabel(href: string, t: ReturnType<typeof useLocale>["t"
   if (href === "/explore") return t("explore");
   if (href === "/scores") return t("leaderboards");
   if (href === "/stats") return t("statistics");
+  if (href === "/firmware") return "Firmware";
   return t("documentation");
 }
 

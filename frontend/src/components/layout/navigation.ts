@@ -11,6 +11,7 @@ export const PUBLIC_NAVIGATION: NavigationItem[] = [
   { label: "Explore", href: "/explore" },
   { label: "Leaderboards", href: "/scores" },
   { label: "Statistics", href: "/stats" },
+  { label: "Firmware", href: "/firmware" },
   { label: "Documentation", href: "/docs" },
 ];
 
