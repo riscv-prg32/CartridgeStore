@@ -17,7 +17,7 @@ Projects save the Blockly workspace serialization in JSON:
 }
 ```
 
-This is stored in `projects.blocks_json`. **Generate C** (or **Generate Assembly**, see `generated_code.md`) turns it into a
+This is stored in `projects.blocks_json`. **Generate C** (or **Generate Assembly**, see the [generated code guide](/docs/construction-kit/generated-code)) turns it into a
 checked game IR (`prg32-construction-kit-game-1.1`) and then into C; the
 browser simulator reads the same JSON into the same IR.
 
@@ -216,5 +216,6 @@ For the example games, title screens rendered by the simulator are identical,
 pixel for pixel, to the framebuffer read from the PRG32 QEMU firmware. Audio
 is approximated with the browser's oscillator; random numbers differ.
 
-See [prg32_feature_coverage.md](prg32_feature_coverage.md) for which PRG32
-services are available in Blocks, in the simulator and in Advanced C.
+See the [PRG32 feature coverage guide](/docs/construction-kit/cartridge-build)
+for which PRG32 services are available in Blocks, in the simulator and in
+Advanced C.

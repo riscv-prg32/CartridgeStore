@@ -3,11 +3,16 @@
 ## Health and logs
 
 ```bash
-docker compose --profile dev ps
-docker compose --profile dev logs --tail=200 backend
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml ps
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml logs --tail=200 backend next docs traefik
 curl -fsS https://api.prg32.test/health
 curl -fsS https://api.prg32.test/ready
 ```
+
+The commands above target the repository-owned Traefik edge. If the optional
+Dream integration is running, use the same commands with
+`docker-compose.dream-platform.yml` and include `backend next docs` in the
+service selection. Do not run two edge overlays at the same time.
 
 ## Backups
 

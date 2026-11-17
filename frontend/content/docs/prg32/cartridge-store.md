@@ -14,10 +14,14 @@ Its standalone repository is [riscv-prg32/CartridgeStore](https://github.com/ris
 The on-device browser reads catalog JSON through a bounded 8,192-byte sliding
 window. It retains parsed result entries rather than allocating a full catalog
 body; entries larger than the window are rejected, as are truncated catalogs. See
-[Memory Architecture](../hardware/memory.md) for RAM measurement guidance.
+the upstream [Memory Architecture guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/memory.md) for RAM measurement guidance.
 
 This document records the firmware-side integration contract, including the
 setup-mode catalog browser and downloader, cartridge metadata, and host tooling.
+
+For the versioned firmware contract, including discovery through
+`/.well-known/prg32-store.json`, `/api/v1` endpoint mapping, retries, and
+conformance tests, see the [PRG32 Store API versioning guide](/docs/store/api-versioning).
 
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="100%" height="100%" style="background-color: #f8f9fa;font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
   <defs>
@@ -238,7 +242,7 @@ python3 -m prg32 upload build-esp32c6/tetris-c.prg32 \
 ### ABI Validation
 Both paths validate the cartridge ABI before deployment. Store downloads accept
 the current hash and the two compatible historical portable hashes listed in
-[the ABI guide](../software/abi.md); other ABI mismatches, missing required
+[the local ABI guide](./abi); other ABI mismatches, missing required
 features, unsupported import models, and incompatible legacy load addresses are
 rejected. Rebuild incompatible cartridges with `--portable` from the matching
 PRG32 checkout.
@@ -281,7 +285,7 @@ Inspect the trailer:
 python3 -m prg32 inspect-metadata dist/asteroids-esp32c6.prg32
 ```
 
-See [cartridge_metadata.md](cartridge_store.md) for the binary trailer and metadata ABI, [colophon_abi.md](/docs/software/colophon_abi.md) for the colophon ABI, and [cartridge_store.md](cartridge_store.md) for the setup-mode integration contract.
+See the local [cartridge format guide](/docs/prg32/cartridges) for the binary trailer and metadata ABI, the upstream [Colophon ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/colophon_abi.md), and this page for the setup-mode integration contract.
 
 > [!NOTE]
 > The external [DeviceDemo repository](https://github.com/riscv-prg32/DeviceDemo) contains its own cartridge metadata, colophon, Store bundle manifest, and build/publish instructions for the `esp32c6` and `qemu` variants.

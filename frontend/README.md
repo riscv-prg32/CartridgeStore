@@ -12,14 +12,16 @@ nvm use 24
 NEXT_PUBLIC_PRG32_API_ORIGIN=http://127.0.0.1:5090 pnpm dev
 ```
 
-The integrated Dream workflow is:
+The complete local stack, including the Store, API, Fumadocs and generic
+Traefik edge, is:
 
 ```bash
-docker compose --profile dev up -d --build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 ```
 
-Then open `https://store.prg32.test`. The API and WebSocket endpoint are
-published at `https://api.prg32.test`.
+Then open `https://store.prg32.test`. Documentation is available at
+`https://store.prg32.test/docs`; the API and WebSocket endpoint are published
+at `https://api.prg32.test`.
 
 ## Checks
 

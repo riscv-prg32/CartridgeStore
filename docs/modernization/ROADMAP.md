@@ -1,8 +1,9 @@
 # Modernization roadmap
 
-The runtime cutover is complete when the Fastify API, Next.js frontend and
-repository-owned Nginx edge are the only application path. Keep this file short; detailed audit
-evidence belongs in the tranche report referenced below.
+The runtime cutover is complete when the Fastify API, Next.js frontend,
+standalone Fumadocs service and one operator-selected edge are the only
+application paths. Keep this file short; detailed audit evidence belongs in the
+tranche report referenced below.
 
 ## Completed
 
@@ -11,18 +12,22 @@ evidence belongs in the tranche report referenced below.
   telemetry boundaries.
 - Removed the old application runtime, templates, static assets and Python
   dependency surface.
-- Simplified development Compose to `backend`, `next` and the repository-owned
-  Nginx edge, reusing Dream Platform's external Mailpit network.
+- Simplified development Compose to `backend`, `next`, `docs` and a selectable
+  edge, with generic Traefik as the documented default and no required mail
+  service.
 - Switched browser API calls to the explicit API origin.
+- Parameterized Store/API origins, local DNS, mkcert and edge networks.
+- Added the standalone Fumadocs service and grouped PRG32 documentation areas.
 - Added the PRG32 brand asset and dashboard UI refinements.
 
 ## Active next steps
 
 - Download the current data from `store.prg32.uniparthenope.it` and upload it
   manually into the new site to demonstrate the catalog workflow.
-- Replace placeholder Dream secrets with Docker secrets in the approved
+- Replace placeholder deployment secrets with Docker secrets in the approved
   deployment environment.
-- Prepare the Fumadocs project from the maintained Markdown documentation.
+- Keep the Fumadocs content synchronized with the maintained repository and
+  companion-repository documentation snapshots.
 - Revisit dashboard workspace decomposition after the public storefront is
   stable.
 - Define API version discovery for firmware clients, including a stable

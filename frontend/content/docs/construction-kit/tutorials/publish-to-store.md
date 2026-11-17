@@ -14,7 +14,7 @@ Open a project and click **Generate C**. Confirm that the generated C looks reas
 
 Click **Compile Cartridge**.
 
-If the PRG32 build toolchain is installed, the result should be a publishable store bundle containing `.prg32` files. If not, the app creates a source-only teaching bundle; the Docker image has the toolchain built in (see `../install_cartridge_build.md`).
+If the PRG32 build toolchain is installed, the result should be a publishable store bundle containing `.prg32` files. If not, the app creates a source-only teaching bundle; the Docker image has the toolchain built in (see the [cartridge build guide](/docs/construction-kit/cartridge-build)).
 
 To test a single cartridge before publishing, use **Download .prg32** instead;
 it builds one architecture and downloads that cartridge file. Publish the

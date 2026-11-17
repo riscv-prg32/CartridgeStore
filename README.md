@@ -48,6 +48,8 @@ Firmware-facing constants remain unchanged, including `esp32c6`, `qemu`,
 The public API is documented in [docs/api.md](docs/api.md). The current
 topology and operational boundaries are described in
 [docs/architecture.md](docs/architecture.md).
+The dedicated Fumadocs application and its content workflow are described in
+[docs-site/README.md](docs-site/README.md).
 The generic local DNS, TLS and Traefik contract is documented in
 [docs/development.md](docs/development.md). Dream Platform remains an optional
 integration documented in [docs/dream-platform.md](docs/dream-platform.md).
@@ -63,6 +65,9 @@ pnpm --dir backend run typecheck
 pnpm --dir backend run lint
 pnpm --dir backend run test
 pnpm --dir backend run build
+pnpm --dir docs-site run typecheck
+pnpm --dir docs-site run build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml config
 pytest -q
 git diff --check
 ```

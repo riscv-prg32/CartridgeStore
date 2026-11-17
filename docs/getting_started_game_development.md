@@ -74,8 +74,13 @@ python3 -m prg32 store pack-bundle \
   --manifest build/store-blackjack/manifest.json \
   --out build/store-blackjack.zip
 python3 -m prg32 store publish-bundle build/store-blackjack.zip \
-  --store-url http://127.0.0.1:5080 --token YOUR_TOKEN
+  --store-url https://api.prg32.test --token YOUR_TOKEN
 ```
+
+The generic local edge publishes the API at `api.prg32.test`. If you are
+running only the direct backend process instead, use its explicit HTTP origin
+instead of the HTTPS host above. For a custom local suffix, use the matching
+value from `PRG32_API_ORIGIN`.
 
 The Store returns a pending submission. An editor must verify it before the
 game appears in `GET /api/games`. See [Getting Started](getting_started.md)

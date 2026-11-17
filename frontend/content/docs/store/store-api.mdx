@@ -3,25 +3,25 @@ title: Store API
 description: A concise map of the public read and workflow endpoints used by the Storefront.
 ---
 
-The Store API is the compatibility boundary for cartridges, scores, metrics, multiplayer, authentication, and statistics.
+The Store API is the compatibility boundary for cartridges, scores, metrics, multiplayer, authentication, and statistics. Firmware clients should use the versioned `/api/v1` paths selected from `/.well-known/prg32-store.json`; the historical `/api` paths remain compatibility aliases.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/games` | List published cartridges |
-| `GET` | `/api/games/<id>` | Read cartridge metadata |
-| `GET` | `/api/games/<id>/download` | Download a selected binary |
-| `GET` | `/api/scores` | Read scores |
-| `GET` | `/api/stats/downloads` | Read download aggregates |
-| `GET` | `/api/stats/scores` | Read bounded top scores |
-| `GET` | `/api/stats/runs` | Read aggregate run counters |
-| `GET` | `/api/multiplayer/status` | Read relay status |
-| `WS` | `/api/multiplayer` | Open the relay |
+| `GET` | `/api/v1/games` | List published cartridges |
+| `GET` | `/api/v1/games/<id>` | Read cartridge metadata |
+| `GET` | `/api/v1/games/<id>/download` | Download a selected binary |
+| `GET` | `/api/v1/scores` | Read scores |
+| `GET` | `/api/v1/stats/downloads` | Read download aggregates |
+| `GET` | `/api/v1/stats/scores` | Read bounded top scores |
+| `GET` | `/api/v1/stats/runs` | Read aggregate run counters |
+| `GET` | `/api/v1/multiplayer/status` | Read relay status |
+| `WS` | `/api/v1/multiplayer` | Open the relay |
 
 ```http
 GET /.well-known/prg32-store.json
-GET /api/games
-GET /api/scores?game=pong&limit=20
-GET /api/stats/downloads?granularity=day&limit=30
+GET /api/v1/games
+GET /api/v1/scores?game=pong&limit=20
+GET /api/v1/stats/downloads?granularity=day&limit=30
 ```
 
 The Storefront calls the public Fastify API origin directly. It does not access SQLite directly or depend on private storage boundaries for public statistics. For authentication and publishing request examples, see [Publishing workflow](/docs/store/publishing).

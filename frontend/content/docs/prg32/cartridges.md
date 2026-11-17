@@ -11,7 +11,7 @@ versions, while executable ABI compatibility follows the rules in
 block, and store metadata can be appended after the legacy payload as a
 `PRG32META` trailer.
 
-The in-tree cartridges under [`cartridges/`](../../cartridges/README.md) are
+The in-tree cartridges under the [PRG32 cartridges directory](https://github.com/riscv-prg32/PRG32/tree/main/cartridges) are
 built as portable packages. Bach's host syntax check uses the public PRG32
 headers directly, so its button masks and audio-mode constants match firmware.
 Other cartridge host checks that use small API test headers must keep those
@@ -74,7 +74,7 @@ After reset, one stored cartridge starts automatically. When multiple slots cont
 ## Building and Uploading
 
 When you have a running PRG32 configuration, you have multiple options to run your first cartridge:
-- Setup the [Cartridge Store](/docs/cartridge_store/cartridge_store.md) and download one of the available cartridges.
+- Set up the [Cartridge Store](/docs/store) and download one of the available cartridges.
 - Download or create your own cartridge and upload it via the host tooling.
 
 The PRG32 repository comes with many example cartridge source codes. Here is an example of how to build and upload the cartridge of the game "Asteroids".
@@ -220,7 +220,7 @@ typedef struct {
 For ordinary sample IDs, instruments retain the original PCM behavior. Sample
 IDs with bit 15 set select ABI-neutral SID-like procedural instruments; their
 ADSR bytes control the generated voice envelope. See
-[`docs/tools/audio.md`](../tools/audio.md#sid-like-procedural-instruments) for
+the [PRG32 audio guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/tools/audio.md#sid-like-procedural-instruments) for
 the encoding and synthesis behavior. The descriptor remains eight bytes.
 
 #### Track Events
@@ -353,7 +353,7 @@ The `META` block uses ABI `prg32-metadata-1.0`.
 }
 ```
 
-Required metadata fields are `abi`, `id`, `title`, and `version`. `authors` and `tags` must be arrays when present. Unknown fields are allowed for forward compatibility. The builder serializes JSON blocks deterministically with sorted keys and compact separators. Cartridges without `SCRN` or `SIGN` are valid. Cartridges without `COLO` are also valid, but the builder warns because the Cartridge Store prefers colophon-complete cartridges. See [colophon_abi.md](colophon_abi.md) for the colophon ABI documentation.
+Required metadata fields are `abi`, `id`, `title`, and `version`. `authors` and `tags` must be arrays when present. Unknown fields are allowed for forward compatibility. The builder serializes JSON blocks deterministically with sorted keys and compact separators. Cartridges without `SCRN` or `SIGN` are valid. Cartridges without `COLO` are also valid, but the builder warns because the Cartridge Store prefers colophon-complete cartridges. See the [Colophon ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/colophon_abi.md) for the colophon ABI documentation.
 
 #### Architecture Variants
 
@@ -410,14 +410,14 @@ python3 -m prg32 store inspect-metadata dist/game-esp32c6.prg32
 The `cartridges/` directory contains complete portable examples with source,
 metadata, screenshots, tests, and reproducible package scripts:
 
-- [`blackjack`](../../cartridges/blackjack/README.md) demonstrates a complete
+- [`blackjack`](https://github.com/riscv-prg32/PRG32/tree/main/cartridges/blackjack) demonstrates a complete
   game, host-tested rules, multiplayer presence, indexed graphics, and an AUD0
   soundtrack.
-- [`devicedemo`](../../cartridges/devicedemo/README.md) is a safe smoke test for
+- [`devicedemo`](https://github.com/riscv-prg32/PRG32/tree/main/cartridges/devicedemo) is a safe smoke test for
   cartridge-visible graphics, input, audio, diagnostics, WiFi, and score APIs.
-- [`bachdemo`](../../cartridges/bachdemo/README.md) exercises all eight audio
+- [`bachdemo`](https://github.com/riscv-prg32/PRG32/tree/main/cartridges/bachdemo) exercises all eight audio
   voices, procedural waveforms, filtering, envelopes, and stereo panning.
-- [`poing`](../../cartridges/poing/README.md) stress-tests public drawing calls
+- [`poing`](https://github.com/riscv-prg32/PRG32/tree/main/cartridges/poing) stress-tests public drawing calls
   with a real-time procedural sphere and perspective grid.
 
 The build scripts use `python3 -m prg32 cartridge build` followed by the
@@ -427,10 +427,10 @@ actual QEMU playfield and UART PCM audio:
 
 | Cartridge | Screenshot | MP4 preview |
 | --- | --- | --- |
-| Bach Stereo Showcase | [PNG](../../cartridges/bachdemo/assets/screenshot.png) | [Download MP4](../../cartridges/bachdemo/assets/preview.mp4) |
-| Blackjack | [PNG](../../cartridges/blackjack/screenshot.png) | [Download MP4](../../cartridges/blackjack/preview.mp4) |
-| DeviceDemo+ | [PNG](../../cartridges/devicedemo/assets/screenshot.png) | [Download MP4](../../cartridges/devicedemo/assets/preview.mp4) |
-| Poing | [PNG](../../cartridges/poing/assets/screenshot.png) | [Download MP4](../../cartridges/poing/assets/preview.mp4) |
+| Bach Stereo Showcase | [PNG](https://github.com/riscv-prg32/PRG32/blob/main/cartridges/bachdemo/assets/screenshot.png) | [Download MP4](https://github.com/riscv-prg32/PRG32/raw/main/cartridges/bachdemo/assets/preview.mp4) |
+| Blackjack | [PNG](https://github.com/riscv-prg32/PRG32/blob/main/cartridges/blackjack/screenshot.png) | [Download MP4](https://github.com/riscv-prg32/PRG32/raw/main/cartridges/blackjack/preview.mp4) |
+| DeviceDemo+ | [PNG](https://github.com/riscv-prg32/PRG32/blob/main/cartridges/devicedemo/assets/screenshot.png) | [Download MP4](https://github.com/riscv-prg32/PRG32/raw/main/cartridges/devicedemo/assets/preview.mp4) |
+| Poing | [PNG](https://github.com/riscv-prg32/PRG32/blob/main/cartridges/poing/assets/screenshot.png) | [Download MP4](https://github.com/riscv-prg32/PRG32/raw/main/cartridges/poing/assets/preview.mp4) |
 
 On macOS, regenerate the previews after sourcing ESP-IDF, building the QEMU
 firmware and all QEMU cartridge packages, and installing `imageio-ffmpeg`:
@@ -507,10 +507,10 @@ On ESP32-C6, multiplayer uses Wi-Fi station mode and the standalone Node.js [Mul
 This is intentionally a classroom loader, not a general dynamic linker.
 
 - Cartridge package size is 128 KiB.
-- For details on executable Cartridge RAM limits and expanding the cartridge limits using profiles, see the [PRG32 Profiles](/docs/usage/profiles.md) documentation.
+- For details on executable Cartridge RAM limits and expanding the cartridge limits using profiles, see the [PRG32 Profiles](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md) documentation.
 - `cartridge build` and `qemu upload` check executable RAM against the 64 KiB
   default profile. Pass `--cart-ram-kib 32` to target the classroom profile;
-  see [Matching Host Tools to the Profile](/docs/usage/profiles.md#matching-host-tools-to-the-profile).
+  see [Matching Host Tools to the Profile](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md#matching-host-tools-to-the-profile).
 
 ## Development Guide
 

@@ -3,7 +3,8 @@
 ## Runtime topology
 
 ```text
-                    Local Nginx edge / Traefik
+              Local Traefik edge (default)
+                    or selected proxy
                               │
                  ┌────────────┼────────────┐
                  │                         │
@@ -20,13 +21,14 @@
 
 The diagram shows the local dnsmasq-backed `.prg32.test` environment only.
 Production uses the same service topology with operator-provided domains and
-origins. Nginx owns local TLS and host routing. The browser calls the API origin directly;
-Next does not proxy application routes. Fastify owns HTTP, WebSocket,
+origins. The selected edge (generic Traefik by default, or Nginx/Dream when
+explicitly configured) owns local TLS and host routing. The browser calls the
+API origin directly; Next does not proxy application routes. Fastify owns HTTP, WebSocket,
 authentication, catalog, publication, telemetry, statistics and discovery.
 
 ## Local Compose
 
-The development Compose file has four application services plus the selected edge:
+The development Compose file has three application services plus the selected edge:
 
 | Service | Responsibility |
 | --- | --- |

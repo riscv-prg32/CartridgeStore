@@ -27,7 +27,8 @@ While the physical PRG32 board uses an ESP32-C6 target with an ILI9341 SPI displ
 Espressif provides QEMU RISC-V packages for: macOS (Intel/Apple Silicon), Windows (x64), and Linux (x86_64, arm64).
 
 ### 1. Install ESP-IDF and QEMU
-Read the Install & Setup section in the main [README](/README.md).
+Read the Install & Setup section in the main
+[PRG32 README](https://github.com/riscv-prg32/PRG32#readme).
 
 ## Running QEMU
 
@@ -60,7 +61,7 @@ QEMU uses the same `.prg32` game packages as the physical board.
    ```bash
    python3 -m prg32 qemu build
    ```
-2. **Prepare a Cartridge**: Build a `.prg32` cartridge for QEMU. See [../software/cartridges.md](/docs/software/cartridges.md) for details.
+2. **Prepare a Cartridge**: Build a `.prg32` cartridge for QEMU. See the local [cartridge build guide](/docs/prg32/cartridges) for details.
 3. **Upload the Cartridge**: Stage it into the emulator's flash image.
    ```bash
    python3 -m prg32 qemu upload build-qemu/asteroids.prg32
@@ -75,7 +76,7 @@ By changing the boot mode to 0 with the `PRG32_BOOT_SETUP_MODE=0` configuration 
 
 The reference performance cartridge follows this workflow with additional
 measurement controls and interpretation rules. See
-[Performance Test Guide](../performance_test.md#4-run-the-reference-test-in-qemu).
+[Performance Test Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md#4-run-the-reference-test-in-qemu).
 QEMU does not expose a cartridge-visible Wi-Fi address, so the completion
 screen shows an explicit `<board-ip>` placeholder; use physical ESP32-C6
 hardware when the JSON result must be retrieved over HTTP.
@@ -137,7 +138,7 @@ or time-stretches generated audio.
 
 ## Troubleshooting
 
-Please refer to the [Troubleshooting Guide](troubleshooting.md#qemu-emulator-issues) for solutions to common QEMU issues.
+Please refer to the [Troubleshooting Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/troubleshooting.md#qemu-emulator-issues) for solutions to common QEMU issues.
 
 ## References
 

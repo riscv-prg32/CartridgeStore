@@ -9,7 +9,7 @@ title: Setup
 - Python 3.11 or newer.
 - A modern browser.
 - Optional: the PRG32 build tools and the RISC-V compiler when real `.prg32`
-  files are required. Step by step: `install_cartridge_build.md`.
+  files are required. See the [cartridge build guide](./cartridge-build).
 - Optional: a PRG32 Cartridge Store instance when publishing from the app.
 
 ## Local Python setup
@@ -37,7 +37,7 @@ http://127.0.0.1:5090/
 | `PRG32_KIT_DB` | `$PRG32_KIT_DATA/construction_kit.sqlite` | SQLite path. |
 | `DATABASE_URL` | unset | SQLAlchemy URL; overrides the SQLite path. |
 | `PRG32_KIT_PORT` | `5090` | HTTP port. |
-| `PRG32_STORE_URL` | `http://127.0.0.1:5080` | Default Cartridge Store URL. |
+| `PRG32_STORE_URL` | `https://api.prg32.test` | Default Cartridge Store API URL when using the generic local edge. |
 | `PRG32_BUILD_COMMAND` | `<kit python> -m prg32 cartridge build` | Command used by Compile Cartridge and Download .prg32. The default uses the same Python that runs the kit. |
 | `PRG32_MAX_PARALLEL_BUILDS` | CPU cores | Compilers running at the same time (`concurrent_builds.md`). |
 | `PRG32_BUILD_QUEUE_TIMEOUT` | `180` | Seconds a build waits for a free compiler. |
@@ -84,7 +84,8 @@ hosting platform's secret or environment configuration.
 ## Switching on cartridge builds
 
 The app can generate C without a PRG32 toolchain. To also create real
-`.prg32` cartridge files, follow `install_cartridge_build.md`. In short, from
+`.prg32` cartridge files, follow the [cartridge build guide](./cartridge-build).
+In short, from
 a `PRG32` checkout next to this one:
 
 ```bash

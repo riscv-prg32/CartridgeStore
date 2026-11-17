@@ -36,7 +36,8 @@ Below the simulator screen, the classic-style gamepad lets students test games w
    comment repeats the block and shows its C line (`C: ...`). Find the same
    block in the **Generated C** tab and compare.
 5. **Compile Cartridge** with **Assembly (RISC-V)** chosen builds the
-   cartridge from the assembly instead of the C. See `generated_code.md`.
+   cartridge from the assembly instead of the C. See the [generated code
+   guide](/docs/construction-kit/generated-code).
 
 ## How to download a PRG32 cartridge
 
@@ -48,7 +49,8 @@ Below the simulator screen, the classic-style gamepad lets students test games w
 The server needs the PRG32 toolchain for this step. The Docker image already
 has it. If the editor says "this server cannot compile PRG32 cartridges yet",
 nothing is downloaded: ask your teacher to follow
-`install_cartridge_build.md`, and read the **Debug Log** tab to see what is missing.
+the [cartridge build guide](/docs/construction-kit/cartridge-build), and read
+the **Debug Log** tab to see what is missing.
 
 ## How to start from a complete game
 

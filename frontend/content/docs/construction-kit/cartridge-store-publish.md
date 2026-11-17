@@ -26,7 +26,7 @@ Open **Publish** and create a profile:
 
 ```text
 Name: Local Cartridge Store
-URL:  http://127.0.0.1:5080
+URL:  https://api.prg32.test
 Token: optional bearer token
 ```
 

@@ -137,4 +137,6 @@ score API. The standalone ScoreServer and Cartridge Store persist uploaded
 records in SQLite.
 
 The same board HTTP server also hosts the cartridge upload API when
-`PRG32_GAME_UPLOAD_ENABLE` is enabled. See `docs/cartridges.md`.
+`PRG32_GAME_UPLOAD_ENABLE` is enabled. For Store packaging and compatibility,
+see the local [cartridge format guide](/docs/prg32/cartridges) and
+[Cartridge Store integration guide](/docs/prg32/cartridge-store).

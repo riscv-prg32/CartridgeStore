@@ -1,81 +1,67 @@
 ---
 title: Platform reference
+description: A map of the PRG32 runtime, hardware, tooling and compatibility references.
 ---
 
-# PRG32 Documentation
+# PRG32 platform reference
 
-Welcome to the documentation for PRG32! To make it easier to find what you need, the documentation is divided into the following categories:
+This page is the map for the PRG32 platform material. The most useful guides
+are reproduced in this documentation hub; specialist firmware notes remain in
+the [PRG32 repository](https://github.com/riscv-prg32/PRG32/tree/main/docs)
+and are linked directly so that the source and its revision are clear.
 
-> [!TIP]
-> **New to PRG32?**
-> Start by reading the [Getting Started With PRG32](usage/getting_started.md) guide! It is the fundamental introduction to building your first game.
+## Start here
 
----
+- [Getting started](./getting-started) — install the toolchain and prepare a target.
+- [Tooling](./tooling) — use the unified `python3 -m prg32` commands.
+- [QEMU](./qemu) — build and run without a physical board.
+- [Cartridge format](./cartridges) — understand portable images and Store-ready metadata.
+- [Cartridge Store integration](./cartridge-store) — discovery, downloads and publishing.
+- [ABI reference](./abi) — compatibility, imports and platform services.
 
-## Repository
-*Information about the repo itself.*
+## Hardware and firmware
 
-- [Repository Structure](repository_structure.md)
+The upstream repository is the authoritative source for material that is not
+duplicated here:
 
-## Usage (Execution & Deployment)
-*Workflows for running the emulator, uploading cartridges, and flashing firmware.*
+- [Hardware setup](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/hardware.md)
+- [Memory architecture](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/memory.md)
+- [External controllers](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/external_controllers.md)
+- [Framework manual](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/framework_manual.md)
+- [Publishing and flashing firmware](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/publishing_and_flashing_firmware.md)
 
-- [QEMU Virtual Screen](usage/qemu.md)
-- [Running Cartridges](software/cartridges.md)
-- [Cartridge Store](cartridge_store/cartridge_store.md)
-- [Setup Mode Cartridge Store](cartridge_store/cartridge_store.md)
-- [Publishing and Flashing Firmware](usage/publishing_and_flashing_firmware.md)
-- [Deployment](usage/publishing_and_flashing_firmware.md)
-- [Troubleshooting](usage/troubleshooting.md)
+## Store and compatibility
 
-## Hardware
-*Physical components, wiring, and hardware setup.*
+Use the local Store documentation for the service boundary and API contracts:
 
-- [Hardware Reference](hardware/hardware.md)
-- [Bill of Materials and Where to Buy](hardware/where_to_buy.md)
-- [External Controllers](hardware/external_controllers.md)
+- [Store overview](/docs/store)
+- [Cartridge format](/docs/store/cartridge-format)
+- [Metadata and compatibility](/docs/store/metadata)
+- [Publishing workflow](/docs/store/publishing)
+- [Store API](/docs/store/store-api)
+- [Scores](/docs/store/scores)
+- [Metrics](/docs/store/metrics)
+- [Multiplayer](/docs/store/multiplayer)
 
-## Software
-*Software architecture, APIs, ABI, and firmware internals.*
+The upstream references remain useful for protocol details and migration notes:
 
-- [Application Binary Interface (ABI)](software/abi.md)
-- [Web API Reference](software/api.md)
-- [PRG32-QT Optional Debugger API](software/api.md#prg32-qt-optional-debugger-api)
-- [C Framework Manual](software/framework_manual.md)
-- [Updating Controllers and Wi-Fi](software/framework_manual_update_controllers_wifi.md)
-- [Memory Architecture](hardware/memory.md)
-- [Cartridge Format](software/cartridges.md)
-- [Cartridge Metadata](cartridge_store/cartridge_store.md)
-- [Colophon ABI](software/colophon_abi.md)
+- [Web API reference](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/api.md)
+- [Colophon ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/colophon_abi.md)
+- [Profiles](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/profiles.md)
+- [Troubleshooting](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/troubleshooting.md)
 
-## Learn
-*Tutorials, guides, and teaching materials.*
+## Measurement and tools
 
-- [Getting Started With PRG32](usage/getting_started.md)
-- [PRG32 Tutorial](learn/tutorial.md)
-- [ASCII Game Tutorial](learn/tutorial_ascii_game.md)
-- [C Game Tutorial](learn/tutorial_c_game.md)
-- [Graphic Game Tutorial](learn/tutorial_graphic_game.md)
-- [Teaching with PRG32](learn/teaching_with_prg32.md)
-- [Examples](learn/examples.md)
+- [Performance test guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md)
+- [Metrics API](https://github.com/riscv-prg32/PRG32/blob/main/docs/measurement/metrics_api.md)
+- [Performance cartridge ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/measurement/performance_cartridge_abi.md)
+- [Scientific measurement tutorial](https://github.com/riscv-prg32/PRG32/blob/main/docs/measurement/scientific_measurement_tutorial.md)
+- [Asset guidelines](https://github.com/riscv-prg32/PRG32/blob/main/docs/tools/assets.md)
+- [Audio tools](https://github.com/riscv-prg32/PRG32/blob/main/docs/tools/audio.md)
 
-## Tools
-*Asset creation and offline development tools.*
+## Source of truth
 
-- [Asset Guidelines](tools/assets.md)
-- [Audio Tools](tools/audio.md)
-- [Tooling Reference](usage/tooling.md)
-
-## Measurement
-*Scientific and performance measurement guides, including paired RGB565 and
-indexed-color benchmarks.*
-
-- [Performance Test Guide](performance_test.md)
-- [Scientific Measurement Tutorial](measurement/scientific_measurement_tutorial.md)
-- [Metrics API](measurement/metrics_api.md)
-- [Performance Cartridge ABI](measurement/performance_cartridge_abi.md)
-
-## Cartridge Store
-*Multiplayer, Score upload*
-
-- [Score API](cartridge_store/score_api.md)
+If a copied guide and the implementation disagree, prefer the current code,
+the generated CLI `--help` output and the upstream PRG32 repository for
+firmware-facing behavior. Changes to shared ABI names, architecture IDs or
+Store routes must be checked against both repositories before publication.

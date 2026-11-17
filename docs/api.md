@@ -7,6 +7,29 @@ evidence in the repository test suites.
 PRG32 Cartridge Store combines cartridge catalog, score, metrics, multiplayer,
 authentication, and statistics contracts on one host.
 
+## Firmware flashing over USB
+
+The public Store page `/firmware` exposes the official PRG32 ESP32-C6 release
+flow. It uses Chrome or Edge Web Serial and never writes a board until the
+browser has checked the release format, selected pin profile, file size, and
+SHA-256 for every flash part. The normal profile writes only bootloader,
+partition table, and application data; the optional full erase is explicitly
+confirmed because it removes Wi-Fi settings, cartridges, and scores.
+
+The Fastify backend proxies and caches release assets from
+`riscv-prg32/PRG32`, which avoids browser CORS problems and gives the page a
+same-origin integrity boundary:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/firmware/releases` | List valid ESP32-C6 releases and pin profiles |
+| `GET` | `/api/firmware/releases/<tag>/prg32-firmware.json` | Return the validated release manifest |
+| `GET` | `/api/firmware/releases/<tag>/<part>.bin` | Serve a manifest-listed, SHA-256-verified flash part |
+
+The firmware flashing page is intentionally separate from the cartridge
+download flow. Multiplayer remains integrated in this same Store service and
+continues to use `/api/multiplayer` and `/api/multiplayer/status`.
+
 ## Discovery
 
 ```http
@@ -17,6 +40,14 @@ The `services` object includes `cartridges`, `bundle_publish`, `submissions`,
 `scores`, `metrics`, `multiplayer`, and `multiplayer_status` URLs. When mDNS
 advertisement is enabled, the service is announced as `_prg32store._tcp.local.`
 with TXT record `abi=prg32-store-discovery-1.0`.
+
+The discovery response also exposes `api_version`, `api_base`, `api_versions`,
+and `services_v1`. Firmware clients must use the stable version advertised in
+those fields. The complete firmware contract is documented in
+[PRG32 Store API versioning](firmware-api-versioning.md).
+
+The canonical first-generation API prefix is `/api/v1`. Existing `/api/...`
+paths remain compatibility aliases and execute the same handlers.
 
 ## Authentication
 
@@ -95,9 +126,9 @@ Routes requiring auth:
 | `POST /api/submissions/<id>/verify` | `editors` group |
 | `POST /api/submissions/<id>/reject` | `editors` group |
 | `POST /api/scores` | logged in or Bearer token |
-| `/setup`, `/setup/logo`, `/setup/favicon` | admin |
-| `/admin/users*`, `/admin/groups*`, `/admin/roles`, `/admin/backup*` | admin |
-| `/admin/cartridges*` | admin or `editors` group |
+| `/api/setup/*`, `/api/admin/settings*`, `/api/admin/settings/assets/*` | admin |
+| `/api/admin/users*`, `/api/admin/groups*`, `/api/admin/roles`, `/admin/backup*` | admin |
+| `/api/admin/cartridges*` | admin or `editors` group |
 | `/users/<username>/runs*` | owner or admin |
 
 Metrics ingestion remains compatible with existing clients. If a run is posted
@@ -117,21 +148,44 @@ the external provider id and email address.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET/POST` | `/setup` | Edit store, auth, publish, mDNS, SMTP, OIDC, and SAML2 settings |
-| `GET/POST` | `/admin/users` | List and create users |
-| `POST` | `/admin/users/<id>` | Update username, email, role, password, and groups |
-| `DELETE` | `/admin/users/<id>` | Delete a user |
-| `POST` | `/admin/users/<id>/delete` | Browser delete fallback |
-| `GET/POST` | `/admin/groups` | List and create groups |
-| `POST` | `/admin/groups/<id>` | Rename a group |
-| `DELETE/POST` | `/admin/groups/<id>/delete` | Delete a group |
-| `GET` | `/admin/roles` | List fixed roles and user counts |
-| `GET` | `/admin/cartridges` | List cartridges for administration |
-| `POST` | `/admin/cartridges/<id>/<version>` | Edit title, summary, and tags |
-| `DELETE/POST` | `/admin/cartridges/<id>/<version>/delete` | Delete a variant or version |
+| `GET/POST` | `/api/setup/*` | Read setup state and complete first-run setup |
+| `GET/POST` | `/api/admin/users` | List and create users |
+| `GET/PATCH` | `/api/admin/users/<id>` | Read or update username, email and password |
+| `DELETE` | `/api/admin/users/<id>` | Delete a user |
+| `GET/POST` | `/api/admin/groups` | List and create groups |
+| `POST/DELETE` | `/api/admin/groups/<id>` | Rename or delete a group |
+| `GET` | `/api/admin/roles` | List fixed roles and user counts |
+| `GET` | `/api/admin/cartridges` | List cartridges for administration |
+| `PATCH/POST` | `/api/admin/cartridges/<id>` | Edit title, summary and tags |
+| `DELETE` | `/api/admin/cartridges/<id>` | Delete a variant or version |
 | `GET` | `/admin/backup` | Backup/restore page |
 | `GET` | `/admin/backup/download` | Download a full backup ZIP |
 | `POST` | `/admin/backup/restore` | Restore a full backup ZIP |
+
+### Settings, managed assets and audit
+
+The dashboard settings and governance screens use the following admin-only
+routes. They require the corresponding RBAC permission, a browser session and
+the CSRF token for mutations:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/admin/settings` | Read typed settings and runtime metadata |
+| `PATCH` | `/api/admin/settings` | Update writable settings with optimistic versions |
+| `POST` | `/api/admin/settings/smtp/test-connection` | Verify the configured SMTP connection |
+| `POST` | `/api/admin/settings/smtp/test-message` | Send a controlled SMTP test message |
+| `POST` | `/api/admin/settings/assets/logo` | Replace the Store logo asset |
+| `DELETE` | `/api/admin/settings/assets/logo` | Remove the managed Store logo |
+| `POST` | `/api/admin/settings/assets/favicon` | Replace the browser favicon asset |
+| `DELETE` | `/api/admin/settings/assets/favicon` | Remove the managed favicon |
+| `GET` | `/api/assets/logo` | Serve the active logo |
+| `GET` | `/api/assets/favicon` | Serve the active favicon |
+| `GET` | `/api/admin/audit` | List bounded administrative audit events |
+| `GET` | `/api/admin/audit/<event_id>` | Read one audit event and its change details |
+
+Settings asset uploads accept supported image formats and are optimized on the
+server. The public logo and favicon URLs are resolved by the Store runtime;
+clients should not hard-code generated asset filenames.
 
 ## Cartridge Catalog
 

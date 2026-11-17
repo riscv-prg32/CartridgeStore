@@ -90,6 +90,17 @@ The canonical local data root defaults to `.local/candidate/canonical`; set
 `PRG32_CANONICAL_DATA_DIR` to an explicit disposable directory when required.
 Never point this development stack at operational data.
 
+The root `.env` is loaded automatically by Compose. Keep these values aligned
+when using a custom local suffix:
+
+```dotenv
+PRG32_STORE_DOMAIN=store.prg32.test
+PRG32_API_DOMAIN=api.prg32.test
+PRG32_STORE_ORIGIN=https://store.prg32.test
+PRG32_API_ORIGIN=https://api.prg32.test
+PRG32_SESSION_COOKIE_DOMAIN=.prg32.test
+```
+
 The certificate files live under `.local/tls` and are ignored by Git. If the
 host ports are already in use, set `PRG32_HTTP_PORT` and `PRG32_HTTPS_PORT` for
 a temporary alternate port, or stop the previous edge before starting this
@@ -108,6 +119,13 @@ Run the frontend with an explicit API origin:
 ```bash
 NEXT_PUBLIC_PRG32_API_ORIGIN=http://127.0.0.1:5090 \
   pnpm --dir frontend dev
+```
+
+Run the documentation service directly when iterating on Fumadocs:
+
+```bash
+NEXT_PUBLIC_PRG32_STORE_ORIGIN=http://127.0.0.1:3000 \
+  pnpm --dir docs-site dev
 ```
 
 ## Validation

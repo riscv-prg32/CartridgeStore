@@ -2,15 +2,19 @@
 
 ## Docker path
 
-Install Docker Desktop with the shared Dream edge network available, then run:
+Install Docker Desktop, configure dnsmasq and mkcert as described in
+[Development](development.md), then run:
 
 ```bash
 source "$HOME/.nvm/nvm.sh"
 nvm use 24
-docker compose --profile dev up -d --build
+cp .env.example .env
+./deploy/local/setup-tls.sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 ```
 
-Open `https://store.prg32.test` and use
+Open `https://store.prg32.test` for the Store,
+`https://store.prg32.test/docs` for documentation and use
 `https://api.prg32.test/ready` to confirm the API.
 
 ## Direct path

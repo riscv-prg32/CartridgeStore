@@ -20,6 +20,11 @@ happens before services start. Values below are examples, never credentials.
 | `PRG32_BACKEND_CORS_ORIGINS` | Exact browser origins |
 | `PRG32_BACKEND_EMAIL_TRANSPORT` | `memory` for tests or `smtp` for deployment |
 | `PRG32_BACKEND_MDNS_ENABLED` | Enable classroom discovery advertisement |
+| `PRG32_BACKEND_FIRMWARE_REPOSITORY` | GitHub repository that publishes `prg32-firmware.json` releases; default `riscv-prg32/PRG32` |
+| `PRG32_BACKEND_FIRMWARE_DIRECTORY` | Optional offline firmware directory with one release folder per tag |
+| `PRG32_BACKEND_FIRMWARE_LIST_TTL_SECONDS` | In-memory release-list cache duration; default `600` |
+| `PRG32_BACKEND_FIRMWARE_HTTP_TIMEOUT_MS` | GitHub fetch timeout; default `30000` |
+| `PRG32_BACKEND_FIRMWARE_GITHUB_TOKEN[_FILE]` | Optional GitHub token for private/rate-limited release reads |
 
 Secrets may be supplied through Docker secrets with the `_FILE` suffix. Do not
 put operational secrets in Compose YAML or source control.
@@ -29,10 +34,29 @@ put operational secrets in Compose YAML or source control.
 | Variable | Meaning |
 | --- | --- |
 | `NEXT_PUBLIC_PRG32_API_ORIGIN` | Fastify API origin used by browser clients |
+| `NEXT_PUBLIC_PRG32_STORE_ORIGIN` | Public Store origin used in links and previews |
 | `NEXT_PUBLIC_PRG32_WS_URL` | Public WebSocket URL when configured |
 | `NEXT_TELEMETRY_DISABLED` | Disable Next telemetry |
 
 The frontend has no API rewrite target or second backend origin.
+
+## Local edge
+
+The generic development overlay reads these values from the root `.env`:
+
+| Variable | Meaning |
+| --- | --- |
+| `PRG32_STORE_DOMAIN` | Store and `/docs` hostname used by the edge |
+| `PRG32_API_DOMAIN` | API hostname used by the edge |
+| `PRG32_STORE_ORIGIN` | Full Store origin passed to backend, frontend and docs |
+| `PRG32_API_ORIGIN` | Full API origin passed to backend and frontend |
+| `PRG32_SESSION_COOKIE_DOMAIN` | Cookie domain shared by browser origins |
+| `PRG32_TRAEFIK_NETWORK` | Docker network used by repository-owned Traefik |
+| `PRG32_TLS_DIR` | Directory containing the mkcert certificate and key |
+
+Keep the domain, origin, dnsmasq and certificate values synchronized. The
+optional Dream overlay additionally uses `DREAM_EDGE_NETWORK` and
+`DREAM_MAIL_NETWORK` for its external networks.
 
 ## Production host variables
 

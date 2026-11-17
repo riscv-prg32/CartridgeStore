@@ -1,0 +1,41 @@
+---
+title: Firmware API versioning
+description: Discovery and compatibility rules for ESP32-C6 and QEMU clients.
+---
+
+# Firmware API versioning
+
+The firmware-facing API is selected through the stable discovery document:
+
+```http
+GET /.well-known/prg32-store.json
+```
+
+The first stable generation uses the canonical prefix:
+
+```text
+/api/v1
+```
+
+New firmware must read `api_versions`, select a supported stable version, and
+resolve URLs from its `base_url` or `services_v1` entry. It must not hard-code
+the Store host or assume that the web and API origins are identical.
+
+## Runtime endpoints
+
+| Capability | Endpoint |
+| --- | --- |
+| Catalog | `GET /api/v1/games` |
+| Cartridge metadata | `GET /api/v1/games/{game_id}` |
+| Cartridge download | `GET /api/v1/games/{game_id}/download` |
+| Scores | `GET/POST /api/v1/scores` |
+| Metrics | `POST /api/v1/runs`, `POST /api/v1/metrics/batch` |
+| Multiplayer | `wss://.../api/v1/multiplayer` |
+
+The old `/api/...` paths remain compatibility aliases for existing firmware;
+they are not a second implementation. Within `v1`, response fields may be
+added but existing fields must not change type or meaning.
+
+The complete normative contract, including the discovery schema, download
+semantics, authentication, errors, retry rules, and conformance checklist is
+in [`docs/firmware-api-versioning.md`](https://github.com/dreamwhite/CartridgeStore/blob/development/docs/firmware-api-versioning.md).

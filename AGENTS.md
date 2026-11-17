@@ -6,7 +6,8 @@ Guidance for coding agents working in this repository.
 
 PRG32 Cartridge Store is the classroom service for PRG32 cartridges. The
 repository contains one Fastify/TypeScript API and one Next.js frontend behind
-an Nginx edge. Local dnsmasq hostnames and the mail service are operator-provided
+an operator-controlled edge and a separate Fumadocs documentation service.
+Local dnsmasq hostnames, TLS and mail services are operator-provided
 development details, not application defaults. These names are not production
 domains; production must provide its own registered DNS names, TLS
 certificates, public origins, cookie domain, and WebSocket URL through the
@@ -23,6 +24,7 @@ reproducible.
 |-- backend/                 Fastify API, storage and service modules
 |-- frontend/                Next.js application and browser tests
 |-- docs/                    Setup, deployment, API and Fumadocs-ready Markdown
+|-- docs-site/               Standalone Next.js/Fumadocs documentation app
 |-- deploy/                  Deployment templates and backup tooling
 |-- cli/                     Firmware-facing integration client
 |-- docker-compose.yml       Local development topology
@@ -73,9 +75,11 @@ instead of replacing existing ones.
 - Keep persistent data mounted at `/data` in deployment templates.
 - Keep the WebSocket relay on the same HTTP port as the API.
 - Images must run without host-specific paths.
-- Local development uses `backend`, `next` and the repository-owned Nginx edge.
-- Local development may attach the backend to the external `dream_mail`
-  network; do not add a second Mailpit service to this Compose project.
+- Local development uses `backend`, `next`, `docs` and one selected edge:
+  repository-owned Traefik by default, or the optional Nginx/Dream integration.
+- The generic local stack keeps email in memory. The optional Dream integration
+  may attach only the backend to an external mail network; do not add a second
+  Mailpit service to this Compose project.
 
 ## Firmware consistency
 
@@ -110,6 +114,9 @@ pnpm --dir backend run typecheck
 pnpm --dir backend run lint
 pnpm --dir backend run test
 pnpm --dir backend run build
+pnpm --dir docs-site run typecheck
+pnpm --dir docs-site run build
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml config
 docker compose config
 pytest -q
 git diff --check

@@ -10,7 +10,7 @@ When a student clicks **Generate C**, the app converts Blocks JSON to game IR an
 With **Assembly (RISC-V)** or **C + Assembly** chosen in the **Generated code**
 list, the same game IR also becomes explained RISC-V (RV32IM) assembly, and
 **Compile Cartridge** can build the cartridge from `game.S` instead of
-`game.c`. See `generated_code.md`.
+`game.c`. See the [generated code guide](./generated-code).
 
 Generated C exports three functions:
 
@@ -45,7 +45,8 @@ incompatible runtime rejects the cartridge before execution. For Blocks
 projects the kit works the features out from the blocks (sound blocks need
 `audio`, tile blocks `tilemap`, and so on); projects that use multiplayer also
 get the builder's `--multiplayer` option, which marks the cartridge header.
-See `prg32_feature_coverage.md`.
+The supported feature set is derived from the blocks used by the project and
+is written into the cartridge header before publication.
 
 The browser simulator runs Blocks projects. Test Advanced C cartridges in
 PRG32 QEMU or on the physical ESP32-C6 board. The editor does not compile C
@@ -88,8 +89,8 @@ Default (with the same Python that runs the kit):
 <kit python> -m prg32 cartridge build
 ```
 
-Installing the tools and the compiler, for Docker, macOS, Linux and Windows,
-is explained step by step in `install_cartridge_build.md`.
+Installing the tools and the compiler for Docker, macOS, Linux and Windows is
+covered by this guide and the [PRG32 getting-started guide](../prg32/getting-started).
 
 The app appends:
 

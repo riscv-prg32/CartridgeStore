@@ -1,6 +1,6 @@
 # Fastify runtime cutover audit
 
-Date: 2026-10-19
+Date: 2026-10-19 (historical cutover snapshot)
 Branch: `development`
 Baseline: `085bb7e`
 
@@ -23,13 +23,13 @@ production configured store host -> Next.js
 production configured api host   -> Fastify
 ```
 
-The first two hosts are local-only names resolved by the author's dnsmasq and
-Dream/Traefik setup. They are not production domains. A production server
+The first two hosts are local-only names resolved by the operator's dnsmasq
+and selected local edge. They are not production domains. A production server
 must provide its own registered DNS names, TLS certificates, public origins,
 cookie domain, and WebSocket URL. The external edge owns TLS and host routing;
-the browser calls the API origin directly. The root development Compose
-profile contains only `backend` and `next`, with the canonical local data root
-mounted at `.local/candidate/canonical` by default.
+the browser calls the API origin directly. The current development topology
+contains `backend`, `next`, `docs` and one selected edge, with the canonical
+local data root mounted at `.local/candidate/canonical` by default.
 
 ## Route and contract audit
 
@@ -108,8 +108,9 @@ operation and is not performed by this cutover.
   environment when Playwright browsers and SMTP capture are available.
 - The dashboard presentation can continue to be decomposed after the
   storefront/runtime cutover; it is outside this runtime boundary.
-- Fumadocs conversion should consume the maintained Markdown files after
-  obsolete working notes are removed.
+- Fumadocs now consumes the maintained documentation snapshots through the
+  standalone `docs-site` service; keep those snapshots reviewed when source
+  repositories change.
 
 ## Commits created
 

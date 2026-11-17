@@ -26,7 +26,7 @@ You can use PlatformIO when you want a convenient VS Code workflow for the physi
 | Package/publish Cartridge Store bundles    | ESP-IDF + Tooling             |
 | Modify PRG32 framework internals           | ESP-IDF + Tooling             |
 ## 2. Install
-If you have not installed PRG32 yet, follow the Install & Setup guide in the [README](/README.md).
+If you have not installed PRG32 yet, follow the Install & Setup guide in the [PRG32 README](https://github.com/riscv-prg32/PRG32#readme).
 ## 3. Build
 If you are using the **ESP-IDF + Tooling** environment, the `python -m prg32` package is available to execute commands.
 
@@ -39,7 +39,7 @@ alias get_idf=". $HOME/esp-idf/export.sh"
 alias prg="python -m prg32"
 ```
 ### Running PRG32 on the ESP32C6
-If you have the physical PRG32 hardware, after [configuring the hardware setup](/docs/hardware/hardware.md) you can build the project for the ESP32C6 and flash it to the SoC:
+If you have the physical PRG32 hardware, after following the [PRG32 hardware setup guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/hardware/hardware.md) you can build the project for the ESP32C6 and flash it to the SoC:
 ```bash
 python -m prg32 esp32c6 build-and-flash
 ```
@@ -68,7 +68,7 @@ performance-test cartridge runs matched RGB565 and full-indexed passes,
 displays an aggregate summary, and retains compact JSON at
 `/api/performance.json` until reboot or the next run. Poing can publish a
 separate application-level result when SELECT starts its performance mode.
-See the [Performance Test Guide](../performance_test.md).
+See the [Performance Test Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md).
 
 **Navigation Commands:**
 - **Joystick**: Navigate menus (QEMU: keyboard arrows)
@@ -206,12 +206,12 @@ You can also run the cartridge through the python tooling:
 python -m prg32 esp32c6 run --url http://192.168.4.1 --slot cart0
 ```
 
-For any errors, before opening a Github Issue, please consult [Troubleshooting](troubleshooting.md).
+For any errors, before opening a GitHub issue, please consult the [Troubleshooting guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/troubleshooting.md).
 
 ## 6. What To Read Next
 
-- For uploading your cartridge to the Cartridge Store, read the [Cartridge Store documentation file](/docs/cartridge_store/cartridge_store.md).
-- For a complete setup verification, read the [Setup Verification documentation file](setup_verification.md).
+- For uploading your cartridge to the Cartridge Store, read the local [Cartridge Store guide](/docs/prg32/cartridge-store).
+- For complete setup verification, follow the [PRG32 setup verification guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/setup_verification.md).
 
 - `docs/cartridges.md`: deeper cartridge workflow and slot behavior.
 - `docs/qemu.md`: host-specific QEMU setup and troubleshooting.

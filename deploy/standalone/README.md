@@ -8,6 +8,11 @@ The base file has no host ports, external networks, proxy labels, Dream
 services, identity-provider services, SMTP fixture or database server. It can
 therefore be used with any reverse proxy or with a private application network.
 
+This production-oriented boundary intentionally contains only Fastify and
+Next.js. The local Fumadocs service is deployed separately through the root
+development Compose topology; add it to a production edge only after defining
+its own image, content release process and public `/docs` route.
+
 ## Prerequisites
 
 - Linux host with Docker Engine and a Compose implementation supporting

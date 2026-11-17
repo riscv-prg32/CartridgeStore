@@ -19,9 +19,12 @@ Start the services with Docker:
 ```bash
 source "$HOME/.nvm/nvm.sh"
 nvm use 24
-docker compose --profile dev up -d --build
+cp .env.example .env
+./deploy/local/setup-tls.sh
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
 ```
 
-Open `https://store.prg32.test` and use `https://api.prg32.test/ready` to confirm the API.
+Open `https://store.prg32.test` for the Store, `https://store.prg32.test/docs`
+for the documentation hub and `https://api.prg32.test/ready` to confirm the API.
 
 For the firmware toolchain and board setup, follow the [PRG32 getting-started guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/usage/getting_started.md).

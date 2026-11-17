@@ -112,9 +112,9 @@ cartridges before distributing them for other firmware images.
 
 The performance broker lifecycle, descriptor layouts, failure semantics, and
 custom-cartridge tutorial are documented in the
-[Performance Test Guide](/docs/performance_test.md). The concise contract is
+[Performance Test Guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/performance_test.md). The concise contract is
 also available in
-[Pluggable Performance Cartridge ABI](/docs/measurement/performance_cartridge_abi.md).
+[Pluggable Performance Cartridge ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/measurement/performance_cartridge_abi.md).
 
 ## Compact Sprite ABI Calls
 
@@ -172,7 +172,7 @@ Store-ready cartridges append a backward-compatible `PRG32META` trailer after
 the payload. The trailer gives host tools and setup-mode clients standard
 blocks for `META`, `ICON`, `SCRN`, `SIGN`, and `COLO`.
 
-Please refer to the [Colophon ABI](colophon_abi.md) for full documentation on cartridge metadata and colophon formats.
+Please refer to the [Colophon ABI](https://github.com/riscv-prg32/PRG32/blob/main/docs/software/colophon_abi.md) for full documentation on cartridge metadata and colophon formats.
 
 ## Audio ABI Calls
 
@@ -216,8 +216,8 @@ SID-like synthesis is ABI-neutral: bit 15 of the existing instrument
 descriptor layout, tracker event, or AUDIO block version changed. Portable
 cartridges built before synthesis therefore remain compatible, and ordinary
 sample IDs retain PCM semantics. The encoding is defined in the
-[audio guide](../tools/audio.md#sid-like-procedural-instruments). The later
-[synth ID decoder fix](../tools/audio.md#synth-id-decoder-fix) and delta-0
+[audio guide](https://github.com/riscv-prg32/PRG32/blob/main/docs/tools/audio.md#sid-like-procedural-instruments). The later
+[synth ID decoder fix](https://github.com/riscv-prg32/PRG32/blob/main/docs/tools/audio.md#synth-id-decoder-fix) and delta-0
 tracker timing fix change runtime behaviour only, not the ABI.
 
 ## RGB LED ABI Calls

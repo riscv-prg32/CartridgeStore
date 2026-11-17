@@ -11,7 +11,7 @@ Goal: run a 45-minute classroom activity.
 1. Start PRG32-Construction-Kit. With Docker (`docker compose up -d --build`)
    cartridge builds work out of the box. Check them before class with
    `docker compose exec prg32-construction-kit python tools/check_build.py --students 10 --windows 2`
-   (see `../install_cartridge_build.md`).
+   (see the [cartridge build guide](/docs/construction-kit/cartridge-build)).
 2. Optional: start Cartridge Store.
 3. Optional: connect a PRG32 device or QEMU workflow.
 4. Test that students can open the web app.
@@ -35,7 +35,7 @@ Students click **Generate C** and find the C statement produced by one block.
 Older students can choose **C + Assembly** in the **Generated code** list,
 click **Generate C + Assembly**, and find the same block in the
 **Generated Assembly** tab: its comment shows the C line, and every
-instruction says what it does (see `../generated_code.md`).
+instruction says what it does (see the [generated code guide](/docs/construction-kit/generated-code)).
 
 ## 30-40 minutes: sprites and artifacts
 
