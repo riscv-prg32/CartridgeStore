@@ -20,6 +20,7 @@ import {
 } from "./catalog.js";
 import { CanonicalCatalog, type ResolvedCatalogMedia } from "../storage-v2/catalog.js";
 import { CANONICAL_DISPOSABLE_READ_MODE, CANONICAL_OPERATIONAL_READ_MODE, CANONICAL_READ_AUTHORIZATION } from "../storage-v2/read-mode.js";
+import { API_V1_BASE_PATH, API_V1_VERSION } from "../api/versioning.js";
 
 interface CatalogQuery {
   readonly q?: string;
@@ -253,10 +254,26 @@ export function registerCatalogRoutes(app: FastifyInstance, options: CatalogRout
     const apiHost = apiOrigin ? new URL(apiOrigin).host : webHost;
     const apiScheme = apiOrigin ? new URL(apiOrigin).protocol.replace(":", "") : webScheme;
     const websocket = apiScheme === "https" ? "wss" : "ws";
+    const legacyApiBase = `${apiBase}/api`;
+    const versionedApiBase = `${apiBase}${API_V1_BASE_PATH}`;
+    const versionedServices = {
+      cartridges: `${versionedApiBase}/games`,
+      bundle_publish: `${versionedApiBase}/publish/bundle`,
+      submissions: `${versionedApiBase}/submissions`,
+      scores: `${versionedApiBase}/scores`,
+      metrics: `${versionedApiBase}/runs`,
+      multiplayer: `${websocket}://${apiHost}${API_V1_BASE_PATH}/multiplayer`,
+      multiplayer_status: `${versionedApiBase}/multiplayer/status`
+    };
     return sendJson(reply, {
       abi: DISCOVERY_ABI,
       name: catalog.storeName(options.config.storeName),
-      api: `${apiBase}/api`,
+      // `api` and `services` are retained for existing firmware. New clients
+      // must use api_base/api_versions and services_v1 below.
+      api: legacyApiBase,
+      api_version: API_V1_VERSION,
+      api_base: versionedApiBase,
+      api_versions: [{ version: API_V1_VERSION, status: "stable", base_url: versionedApiBase }],
       web: `${webOrigin ?? `${webScheme}://${webHost}`}/`,
       version: options.config.storeVersion,
       auth_enabled: true,
@@ -269,7 +286,8 @@ export function registerCatalogRoutes(app: FastifyInstance, options: CatalogRout
         metrics: `${apiBase}/api/runs`,
         multiplayer: `${websocket}://${apiHost}/api/multiplayer`,
         multiplayer_status: `${apiBase}/api/multiplayer/status`
-      }
+      },
+      services_v1: versionedServices
     });
   });
 
@@ -277,6 +295,8 @@ export function registerCatalogRoutes(app: FastifyInstance, options: CatalogRout
     ok: true,
     service: catalog.storeName(options.config.storeName),
     version: options.config.storeVersion,
+    api_version: API_V1_VERSION,
+    api_base: API_V1_BASE_PATH,
     auth_enabled: true,
     roles: [...ROLE_LEVELS],
     mdns: {
@@ -296,6 +316,20 @@ export function registerCatalogRoutes(app: FastifyInstance, options: CatalogRout
       "POST /api/metrics/batch",
       "GET /api/multiplayer",
       "GET /api/multiplayer/status"
+    ],
+    versioned_endpoints: [
+      "GET /api/v1/games",
+      "POST /api/v1/publish",
+      "POST /api/v1/publish/bundle",
+      "GET /api/v1/submissions",
+      "GET /api/v1/scores",
+      "POST /api/v1/scores",
+      "GET /api/v1/metrics",
+      "GET /api/v1/runs",
+      "POST /api/v1/runs",
+      "POST /api/v1/metrics/batch",
+      "GET /api/v1/multiplayer",
+      "GET /api/v1/multiplayer/status"
     ]
   });
 

@@ -18,6 +18,11 @@ export interface BackendConfig {
   readonly storePortOverride: string | undefined;
   readonly storeName: string;
   readonly storeVersion: string;
+  readonly firmwareRepository: string;
+  readonly firmwareDirectory: string | undefined;
+  readonly firmwareListTtlSeconds: number;
+  readonly firmwareHttpTimeoutMs: number;
+  readonly firmwareGithubToken: string | undefined;
   readonly mdnsEnabled: boolean;
   readonly mdnsName: string;
   readonly mdnsHost: string | undefined;

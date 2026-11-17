@@ -57,6 +57,9 @@ import { SetupService } from "./setup/service.js";
 import { WebAuthnService } from "./auth/webauthn.js";
 import { registerWebAuthnRoutes } from "./auth/webauthn-routes.js";
 import { BoundedRateLimiter } from "./security/rate-limiter.js";
+import { rewriteVersionedApiUrl } from "./api/versioning.js";
+import { FirmwareService } from "./firmware/service.js";
+import { registerFirmwareRoutes } from "./firmware/routes.js";
 
 export interface AppOptions {
   readonly config: BackendConfig;
@@ -243,10 +246,12 @@ export function buildApp(options: AppOptions): FastifyInstance {
     logger: options.logger ?? { level: options.config.logLevel },
     trustProxy: trustProxyPolicy,
     requestTimeout: options.config.httpRequestTimeoutMs,
-    keepAliveTimeout: options.config.httpKeepAliveTimeoutMs
+    keepAliveTimeout: options.config.httpKeepAliveTimeoutMs,
+    rewriteUrl: (request) => rewriteVersionedApiUrl(request.url)
   });
   const catalogRateLimiter = new BoundedRateLimiter(options.config.httpCatalogRateLimitMax, options.config.httpRateLimitWindowSeconds, options.config.httpRateLimitMaxClients);
   const downloadRateLimiter = new BoundedRateLimiter(options.config.httpDownloadRateLimitMax, options.config.httpRateLimitWindowSeconds, options.config.httpRateLimitMaxClients);
+  const firmware = new FirmwareService(options.config);
 
   // Credentialed browser access is opt-in and exact-origin only. The default
   // empty allowlist preserves the existing same-origin behaviour.
@@ -301,6 +306,7 @@ export function buildApp(options: AppOptions): FastifyInstance {
     auth,
     ...(canonicalWorkflow === null ? {} : { downloadTelemetry: canonicalWorkflow })
   });
+  registerFirmwareRoutes(app, firmware);
   registerAuthRoutes(app, { config: options.config, auth, authorization, email, legacyBootstrapAllowed: () => setup.legacyBootstrapAllowed() });
   registerWebAuthnRoutes(app, { config: options.config, auth, authorization, webauthn });
   registerSetupRoutes(app, { config: options.config, setup });

@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { RawData, WebSocket } from "ws";
 
 import { MultiplayerAdmissionError, type MultiplayerHub, type MultiplayerLimits, type MultiplayerPeer } from "./hub.js";
+import { API_V1_BASE_PATH } from "../api/versioning.js";
 
 interface MultiplayerQuery { readonly token?: string }
 
@@ -64,13 +65,15 @@ export function registerMultiplayerRoutes(app: FastifyInstance, options: Multipl
         method: "GET",
         url: "/api/multiplayer",
         handler: (request, reply) => {
+          const originalUrl = (request.raw as typeof request.raw & { originalUrl?: string }).originalUrl ?? request.url;
+          const endpoint = originalUrl.split("?", 1)[0]?.startsWith(`${API_V1_BASE_PATH}/`) ? `${API_V1_BASE_PATH}/multiplayer` : "/api/multiplayer";
           const configuredOrigin = options.publicOrigin ? new URL(options.publicOrigin) : null;
           const scheme = configuredOrigin ? (configuredOrigin.protocol === "https:" ? "wss" : "ws") : (request.protocol === "https" ? "wss" : "ws");
           const host = configuredOrigin?.host ?? request.headers.host ?? "localhost";
           return reply.send({
             ok: true,
             service: "PRG32 multiplayer relay",
-            websocket: `${scheme}://${host}/api/multiplayer`,
+            websocket: `${scheme}://${host}${endpoint}`,
             auth_enabled: options.hub.authenticationEnabled,
             protocol: {
               join: { type: "join", signature: "game-v1", player_id: 1 },

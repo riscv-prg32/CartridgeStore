@@ -256,6 +256,25 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Backen
     storePortOverride: environment.PRG32_STORE_PORT?.trim() || undefined,
     storeName: nonEmpty("PRG32_STORE_NAME", environment.PRG32_STORE_NAME, "PRG32 Cartridge Store"),
     storeVersion: nonEmpty("PRG32_STORE_VERSION", environment.PRG32_STORE_VERSION, "1.0.0"),
+    firmwareRepository: nonEmpty(
+      "PRG32_BACKEND_FIRMWARE_REPOSITORY",
+      environment.PRG32_BACKEND_FIRMWARE_REPOSITORY,
+      "riscv-prg32/PRG32"
+    ),
+    firmwareDirectory: optionalNonEmpty(environment.PRG32_BACKEND_FIRMWARE_DIRECTORY)
+      ? path.resolve(optionalNonEmpty(environment.PRG32_BACKEND_FIRMWARE_DIRECTORY) as string)
+      : undefined,
+    firmwareListTtlSeconds: positiveInteger(
+      "PRG32_BACKEND_FIRMWARE_LIST_TTL_SECONDS",
+      environment.PRG32_BACKEND_FIRMWARE_LIST_TTL_SECONDS,
+      600
+    ),
+    firmwareHttpTimeoutMs: positiveInteger(
+      "PRG32_BACKEND_FIRMWARE_HTTP_TIMEOUT_MS",
+      environment.PRG32_BACKEND_FIRMWARE_HTTP_TIMEOUT_MS,
+      30_000
+    ),
+    firmwareGithubToken: optionalSecret(environment, "PRG32_BACKEND_FIRMWARE_GITHUB_TOKEN"),
     mdnsEnabled,
     mdnsName: nonEmpty("PRG32_BACKEND_MDNS_NAME", environment.PRG32_BACKEND_MDNS_NAME, environment.PRG32_STORE_NAME ?? "PRG32 Cartridge Store"),
     mdnsHost,

@@ -32,6 +32,10 @@ describe("Fastify canonical disposable read integration", () => {
     const listingBody = JSON.parse(listing.body) as { games: Array<{ id: string }> };
     expect(listingBody.games.map((item) => item.id)).toEqual(["org.example.alpha", "org.example.beta"]);
 
+    const versionedListing = await app.inject({ method: "GET", url: "/api/v1/games" });
+    expect(versionedListing.statusCode).toBe(200);
+    expect((JSON.parse(versionedListing.body) as { games: Array<{ id: string }> }).games).toEqual(listingBody.games);
+
     const detail = await app.inject({ method: "GET", url: "/api/games/org.example.alpha?version=2.0.0" });
     expect(detail.statusCode).toBe(200);
     const detailBody = JSON.parse(detail.body) as { game: { selected_version: string; architectures: string[] } };
@@ -115,7 +119,18 @@ describe("Fastify canonical disposable read integration", () => {
     try {
       const discovery = await app.inject({ method: "GET", url: "/.well-known/prg32-store.json", headers: { host: "canonical.test" } });
       expect(discovery.statusCode).toBe(200);
-      expect((JSON.parse(discovery.body) as { name: string }).name).toBe("Canonical Disposable Store");
+      const discoveryBody = JSON.parse(discovery.body) as {
+        name: string;
+        api_version: string;
+        api_base: string;
+        api_versions: Array<{ version: string; status: string; base_url: string }>;
+        services_v1: { cartridges: string };
+      };
+      expect(discoveryBody.name).toBe("Canonical Disposable Store");
+      expect(discoveryBody.api_version).toBe("v1");
+      expect(discoveryBody.api_base).toBe("http://canonical.test/api/v1");
+      expect(discoveryBody.api_versions).toEqual([{ version: "v1", status: "stable", base_url: "http://canonical.test/api/v1" }]);
+      expect(discoveryBody.services_v1.cartridges).toBe("http://canonical.test/api/v1/games");
       const statistics = await app.inject({ method: "GET", url: "/api/stats/scores" });
       expect(statistics.statusCode).toBe(200);
     } finally {

@@ -6,6 +6,7 @@ import type { BackendConfig } from "../config/env.js";
 import { encodePythonJson } from "../compatibility/serialization.js";
 import { publicMetricsError } from "./errors.js";
 import type { MetricsService } from "./service.js";
+import { API_V1_BASE_PATH } from "../api/versioning.js";
 
 interface MetricsRouteOptions {
   readonly config: BackendConfig;
@@ -53,19 +54,23 @@ function sortedJson(value: unknown): unknown {
 export function registerMetricsRoutes(app: FastifyInstance, options: MetricsRouteOptions): void {
   const { auth, config, metrics } = options;
 
-  app.get("/api/metrics", async (_request, reply) => sendJson(reply, {
-    ok: true,
-    service: "PRG32 metrics",
-    endpoints: [
-      "POST /api/runs",
-      "POST /api/metrics/batch",
-      "POST /api/runs/<run_id>/finish",
-      "GET /api/runs",
-      "GET /api/runs/<run_id>",
-      "GET /api/runs/<run_id>/samples.csv",
-      "GET /api/runs/<run_id>/report.md"
-    ]
-  }));
+  app.get("/api/metrics", async (request, reply) => {
+    const originalUrl = (request.raw as typeof request.raw & { originalUrl?: string }).originalUrl ?? request.url;
+    const prefix = originalUrl.split("?", 1)[0]?.startsWith(`${API_V1_BASE_PATH}/`) ? API_V1_BASE_PATH : "/api";
+    return sendJson(reply, {
+      ok: true,
+      service: "PRG32 metrics",
+      endpoints: [
+        `POST ${prefix}/runs`,
+        `POST ${prefix}/metrics/batch`,
+        `POST ${prefix}/runs/<run_id>/finish`,
+        `GET ${prefix}/runs`,
+        `GET ${prefix}/runs/<run_id>`,
+        `GET ${prefix}/runs/<run_id>/samples.csv`,
+        `GET ${prefix}/runs/<run_id>/report.md`
+      ]
+    });
+  });
 
   app.route<{ Body: unknown }>({ method: "POST", url: "/api/runs", bodyLimit: config.metricsMaxContentBytes, handler: async (request, reply) => {
     try { return sendJson(reply, metrics.createRun(body(request), principal(request, auth))); }
